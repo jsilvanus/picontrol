@@ -30,6 +30,7 @@
         <span class="muted" id="has-slide"></span>
       </div>
       <p class="error" id="last-error"></p>
+      <p class="error" id="feed-error"></p>
       <div class="row">
         <button type="button" id="start">Start</button>
         <button type="button" id="stop">Stop</button>
@@ -48,6 +49,21 @@
         <div class="row">
           <label>Width <input id="width" type="number" min="16" max="3840" step="2"></label>
           <label>Height <input id="height" type="number" min="16" max="3840" step="2"></label>
+        </div>
+        <div class="row">
+          <label>Slide source
+            <select id="slide-source">
+              <option value="upload">Sent PNG (test slide)</option>
+              <option value="piprogram">piprogram pipeline</option>
+            </select>
+          </label>
+          <label>Pipeline
+            <select id="pipeline-id">
+              <option value="PiPGM1">PiPGM1</option>
+              <option value="PiPGM2">PiPGM2</option>
+              <option value="PiPGM3">PiPGM3</option>
+            </select>
+          </label>
         </div>
         <div class="row">
           <label>Slide aspect

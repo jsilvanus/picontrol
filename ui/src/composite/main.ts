@@ -12,7 +12,9 @@ import {
   type CompositePatch,
   type CompositeSide,
   type KeyMode,
-  type SlideAspect
+  type PiprogramPipelineId,
+  type SlideAspect,
+  type SlideSource
 } from "./types";
 
 // Entry point of composite.html: the two slide composites (compose1 HDMI key, compose2 ATEM
@@ -100,6 +102,8 @@ function renderStatus(): void {
   state.className = `pill state-${composite.state}`;
   byId("has-slide").textContent = composite.hasSlide ? "Slide received" : "No slide yet";
   byId("last-error").textContent = composite.lastError ?? "";
+  byId("feed-error").textContent =
+    composite.slideSource === "piprogram" && composite.feedError ? `Feed: ${composite.feedError}` : "";
   byId<HTMLButtonElement>("start").disabled = composite.enabled;
   byId<HTMLButtonElement>("stop").disabled = !composite.enabled;
   byId("side-left").setAttribute("aria-pressed", String(composite.side === "left"));
@@ -127,6 +131,8 @@ function fillForm(): void {
   byId<HTMLInputElement>("width").value = String(composite.width);
   byId<HTMLInputElement>("height").value = String(composite.height);
   byId<HTMLSelectElement>("slide-aspect").value = composite.slideAspect;
+  byId<HTMLSelectElement>("slide-source").value = composite.slideSource;
+  byId<HTMLSelectElement>("pipeline-id").value = composite.pipelineId;
   setSlideScale(composite.slideScale);
   byId<HTMLInputElement>("key-color").value = composite.keyColor;
   byId<HTMLSelectElement>("key-mode").value = composite.keyMode;
@@ -160,7 +166,9 @@ function readForm(composite: Composite): CompositePatch | string {
     width,
     height,
     slideAspect: byId<HTMLSelectElement>("slide-aspect").value as SlideAspect,
-    slideScale: Number(byId<HTMLInputElement>("slide-scale").value)
+    slideScale: Number(byId<HTMLInputElement>("slide-scale").value),
+    slideSource: byId<HTMLSelectElement>("slide-source").value as SlideSource,
+    pipelineId: byId<HTMLSelectElement>("pipeline-id").value as PiprogramPipelineId
   };
   if (composite.kind === "hdmi-key") {
     patch.keyColor = byId<HTMLInputElement>("key-color").value;
