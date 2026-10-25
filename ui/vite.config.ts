@@ -1,9 +1,16 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
     outDir: "dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        multiview: fileURLToPath(new URL("./multiview.html", import.meta.url))
+      }
+    }
   },
   server: {
     port: 5173,
