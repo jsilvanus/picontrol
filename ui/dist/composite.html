@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PiControl Composite</title>
-  <script type="module" crossorigin src="/assets/composite-r5pgj3hj.js"></script>
+  <script type="module" crossorigin src="/assets/composite-DXqfsshH.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/assets/dom-C2tdIDSm.js">
   <link rel="stylesheet" crossorigin href="/assets/composite-BjHqgSp5.css">
@@ -35,6 +35,7 @@
         <span class="muted" id="has-slide"></span>
       </div>
       <p class="error" id="last-error"></p>
+      <p class="error" id="feed-error"></p>
       <div class="row">
         <button type="button" id="start">Start</button>
         <button type="button" id="stop">Stop</button>
@@ -53,6 +54,21 @@
         <div class="row">
           <label>Width <input id="width" type="number" min="16" max="3840" step="2"></label>
           <label>Height <input id="height" type="number" min="16" max="3840" step="2"></label>
+        </div>
+        <div class="row">
+          <label>Slide source
+            <select id="slide-source">
+              <option value="upload">Sent PNG (test slide)</option>
+              <option value="piprogram">piprogram pipeline</option>
+            </select>
+          </label>
+          <label>Pipeline
+            <select id="pipeline-id">
+              <option value="PiPGM1">PiPGM1</option>
+              <option value="PiPGM2">PiPGM2</option>
+              <option value="PiPGM3">PiPGM3</option>
+            </select>
+          </label>
         </div>
         <div class="row">
           <label>Slide aspect

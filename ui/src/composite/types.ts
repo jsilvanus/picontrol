@@ -7,6 +7,10 @@ export type CompositeSide = "left" | "right";
 export type SlideAspect = "10:16" | "9:16";
 export type KeyMode = "chroma" | "luma";
 export type CompositeState = "stopped" | "waiting" | "busy" | "running" | "failed";
+/** "upload" = the PNG sent on this page; "piprogram" = the frame of pipelineId as its slide changes. */
+export type SlideSource = "upload" | "piprogram";
+export type PiprogramPipelineId = "PiPGM1" | "PiPGM2" | "PiPGM3";
+export const PIPROGRAM_PIPELINE_IDS: readonly PiprogramPipelineId[] = ["PiPGM1", "PiPGM2", "PiPGM3"];
 
 export interface CompositeAtem {
   mediaSlot: number;
@@ -30,6 +34,10 @@ export interface Composite {
   state: CompositeState;
   lastError: string | null;
   hasSlide: boolean;
+  slideSource: SlideSource;
+  pipelineId: PiprogramPipelineId;
+  /** Why the piprogram feed last failed, or null. */
+  feedError: string | null;
   updatedAt: string;
 }
 
@@ -47,6 +55,8 @@ export interface CompositePatch {
   keyColor?: string;
   keyMode?: KeyMode;
   atem?: Partial<CompositeAtem>;
+  slideSource?: SlideSource;
+  pipelineId?: PiprogramPipelineId;
 }
 
 export const COMPOSITE_IDS: readonly CompositeId[] = ["compose1", "compose2"];
