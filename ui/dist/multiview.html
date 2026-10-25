@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>PiMatrix Multiview (8-Way) &amp; Effects</title>
+  <script type="module" crossorigin src="/assets/multiview-C-CMp0vi.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="stylesheet" crossorigin href="/assets/multiview-CJEqAk_6.css">
+</head>
+<body>
+  <header>
+    <div class="brand-group">
+      <a href="/" class="back-btn" id="multiview-back-btn" title="Back to Home">← Back</a>
+      <div class="brand">Pi<span>Matrix</span> Multiview &amp; Effects</div>
+    </div>
+    <div class="meta">
+      <span class="mode-pill" id="grid-mode">Auto (4x2 / 2x4)</span>
+      <span id="sse-indicator" style="color: #64748b;">● Connecting</span>
+    </div>
+  </header>
+  <main class="grid" id="grid"></main>
+
+  <!-- Crop Modal (filled and driven by src/multiview/crop-modal.ts) -->
+  <div class="modal-overlay" id="crop-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-source-title">Crop &amp; Effects: Source</div>
+        <button class="modal-close" id="crop-close" type="button">&times;</button>
+      </div>
+
+      <!-- Duplicated Cropped Output Preview (above cropper so finger doesn't obstruct) -->
+      <div class="ctrl-label">Cropped Output Preview (Unobstructed)</div>
+      <div class="crop-zoomed-wrap">
+        <div class="crop-zoomed-box" id="crop-zoomed-box">
+          <div id="crop-zoomed-inner" style="position:absolute;top:0;left:0;transform-origin:0 0;pointer-events:none;"></div>
+        </div>
+      </div>
+
+      <!-- Live Crop Box Preview (Drag with finger/mouse) -->
+      <div class="ctrl-label">Interactive Full Frame (Drag Crop Box)</div>
+      <div class="preview-box" id="preview-box">
+        <div id="preview-box-bg" style="width:100%;height:100%;pointer-events:none;"></div>
+        <div class="crop-rect" id="crop-rect">
+          <span class="crop-rect-label" id="crop-rect-label">9:16</span>
+        </div>
+      </div>
+
+      <div class="crop-coords" id="crop-coords">
+        x: 0, y: 0, w: 1920, h: 1080 | FFmpeg: null
+      </div>
+
+      <!-- Presets for Vertical / Landscape -->
+      <div class="ctrl-section">
+        <div class="ctrl-label">Aspect Ratio Presets</div>
+        <div class="btn-row">
+          <button class="btn accent" type="button" data-preset="force-vertical-9-16">📱 9:16 Vertical</button>
+          <button class="btn accent" type="button" data-preset="force-vertical-10-16">📽 10:16 Epson Projector</button>
+          <button class="btn" type="button" data-preset="force-landscape-16-9">🖥 16:9 Landscape</button>
+          <button class="btn danger" type="button" data-preset="reset">↺ Full / Reset</button>
+        </div>
+      </div>
+
+      <!-- Pan & Zoom Controls -->
+      <div class="ctrl-section">
+        <div class="ctrl-label">Move (Pan) &amp; Resize (Zoom)</div>
+        <div class="dpad-container">
+          <div class="dpad">
+            <div></div>
+            <button type="button" data-move="up">▲</button>
+            <div></div>
+            <button type="button" data-move="left">◄</button>
+            <button type="button" data-move="center" style="font-size:10px;">⛶</button>
+            <button type="button" data-move="right">►</button>
+            <div></div>
+            <button type="button" data-move="down">▼</button>
+            <div></div>
+          </div>
+          <div class="zoom-group">
+            <button class="btn" type="button" data-resize="in">🔍+ Zoom In (Tighter Crop)</button>
+            <button class="btn" type="button" data-resize="out">🔍- Zoom Out (Wider Crop)</button>
+            <button class="btn" type="button" id="btn-lock-aspect">🔒 Lock Aspect: ON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
