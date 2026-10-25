@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PiControl Composite</title>
+</head>
+<body>
+  <header>
+    <div class="brand-group">
+      <a href="/" class="back-btn" title="Back to Home">← Back</a>
+      <div class="brand">Pi<span>Control</span> Composite</div>
+    </div>
+    <div class="meta">
+      <span id="api-status" class="pill">Connecting</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card wide" id="tabs-card">
+      <h2>Output</h2>
+      <div id="tabs" class="row" role="tablist"></div>
+      <p class="muted" id="kind-note"></p>
+    </section>
+
+    <section class="card" id="status-card">
+      <h2>Slide composite</h2>
+      <div class="row">
+        <span id="state" class="pill">Not loaded</span>
+        <span class="muted" id="has-slide"></span>
+      </div>
+      <p class="error" id="last-error"></p>
+      <div class="row">
+        <button type="button" id="start">Start</button>
+        <button type="button" id="stop">Stop</button>
+      </div>
+      <div class="row" role="group" aria-label="Slide side">
+        <span class="muted">Slide side</span>
+        <button type="button" id="side-left" aria-pressed="false">Left</button>
+        <button type="button" id="side-right" aria-pressed="false">Right</button>
+      </div>
+      <p class="error" id="status-error"></p>
+    </section>
+
+    <section class="card" id="settings-card">
+      <h2>Settings</h2>
+      <form id="settings-form" novalidate>
+        <div class="row">
+          <label>Width <input id="width" type="number" min="16" max="3840" step="2"></label>
+          <label>Height <input id="height" type="number" min="16" max="3840" step="2"></label>
+        </div>
+        <div class="row">
+          <label>Slide aspect
+            <select id="slide-aspect">
+              <option value="10:16">10:16 (projector)</option>
+              <option value="9:16">9:16</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>Slide height <span id="slide-scale-value">100%</span>
+            <input id="slide-scale" type="range" min="0.6" max="1" step="0.01">
+          </label>
+        </div>
+        <div class="row" id="key-fields">
+          <label>Key colour <input id="key-color" type="color"></label>
+          <label>Key mode
+            <select id="key-mode">
+              <option value="chroma">Chroma</option>
+              <option value="luma">Luma</option>
+            </select>
+          </label>
+        </div>
+        <fieldset id="atem-fields" class="row">
+          <legend class="muted">ATEM media pool</legend>
+          <label>Media slot <input id="media-slot" type="number" min="1" max="64" step="1"></label>
+          <label>Media player <input id="media-player" type="number" min="1" max="4" step="1"></label>
+          <label>DSK <input id="dsk-index" type="number" min="1" max="4" step="1"></label>
+          <label class="check"><input id="auto-on-air" type="checkbox"> Put on air after upload</label>
+        </fieldset>
+        <div class="row">
+          <button type="submit" id="save">Save settings</button>
+        </div>
+      </form>
+      <p class="error" id="settings-error"></p>
+    </section>
+
+    <section class="card" id="preview-card">
+      <h2>Preview</h2>
+      <div class="row">
+        <button type="button" id="preview-refresh">Refresh preview</button>
+      </div>
+      <img id="preview" alt="Key page preview" hidden>
+      <p class="muted" id="preview-empty">No slide has been sent yet.</p>
+      <p class="error" id="preview-error"></p>
+    </section>
+
+    <section class="card" id="slide-card">
+      <h2>Test slide</h2>
+      <p class="muted">Sends a PNG as the slide. piprogram sends the real one; use this to check the layout.</p>
+      <div class="row">
+        <input id="slide-file" type="file" accept="image/png">
+        <button type="button" id="slide-send">Send slide</button>
+      </div>
+      <p class="error" id="slide-error"></p>
+    </section>
+  </main>
+  <script type="module" src="./src/composite/main.ts"></script>
+</body>
+</html>
