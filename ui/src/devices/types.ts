@@ -11,6 +11,7 @@ export interface Camera {
   model: string;
   connection: "connected" | "disconnected" | "simulated";
   streaming: boolean;
+  privacyBlur?: boolean;
 }
 
 export interface AtemState {

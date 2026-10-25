@@ -72,7 +72,26 @@ function cameraCard(camera: Camera): HTMLElement {
     presets.append(button);
   }
   card.append(presets);
+
+  // Privacy blur: manual focus driven to the nearest point; off returns to autofocus.
+  const blurOn = camera.privacyBlur === true;
+  const blur = el("button", "", blurOn ? "Privacy blur: on (back to AF)" : "Privacy blur");
+  blur.type = "button";
+  blur.setAttribute("aria-pressed", String(blurOn));
+  blur.title = blurOn ? "Return the camera to autofocus" : "Blur the picture: manual focus, nearest point";
+  blur.addEventListener("click", () => void setPrivacyBlur(camera.id, !blurOn));
+  card.append(blur);
   return card;
+}
+
+async function setPrivacyBlur(id: CameraId, enabled: boolean): Promise<void> {
+  try {
+    await api.post(`/api/v1/cameras/${id}/privacy-blur`, { enabled });
+    showError("cameras-error", null);
+    await loadCameras();
+  } catch (err) {
+    showError("cameras-error", err);
+  }
 }
 
 async function moveCamera(id: CameraId, direction: MoveDirection): Promise<void> {
