@@ -53,10 +53,7 @@
         </button>
 
         <!-- Camera View Focus Toggle (shown on Cameras tab) -->
-        <button id="toggleViewBtn" type="button" onclick="toggleCamFocus()" class="hidden items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high border border-outline-variant/40 text-primary text-[10px] font-label-sm font-bold uppercase transition-all active:scale-95">
-          <span class="material-symbols-outlined text-[14px]">grid_view</span>
-          <span id="viewModeLabel">Dual View</span>
-        </button>
+        
 
         <!-- Live SSE Status Pill -->
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high border border-outline-variant/30 text-on-surface-variant text-[10px] font-label-sm font-semibold">
@@ -336,7 +333,7 @@
       <!-- Dual Stream Feeds (Select Target for PTZ Drive) -->
       <div class="grid grid-cols-2 gap-space-sm w-full transition-all duration-300" id="monitorsContainer">
         <!-- Camera 01 Feed Card -->
-        <div class="group relative flex flex-col bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 active:scale-[0.99] transition-all cursor-pointer" id="cam-card-1" onclick="selectCamera('cam1')">
+        <div class="group relative flex flex-col bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 active:scale-[0.99] transition-all cursor-pointer" id="cam-card-1" onclick="tapCameraCard('cam1')">
           <div class="h-1.5 w-full bg-primary transition-colors" id="cam-glow-1"></div>
           <div class="relative w-full aspect-video bg-inverse-surface overflow-hidden" id="cam-viewport-1">
             <!-- Populated dynamically with MediaMTX iframe when receiving, or Not Connected picture -->
@@ -360,7 +357,7 @@
         </div>
 
         <!-- Camera 02 Feed Card -->
-        <div class="group relative flex flex-col bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 active:scale-[0.99] transition-all cursor-pointer" id="cam-card-2" onclick="selectCamera('cam2')">
+        <div class="group relative flex flex-col bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 active:scale-[0.99] transition-all cursor-pointer" id="cam-card-2" onclick="tapCameraCard('cam2')">
           <div class="h-1.5 w-full bg-surface-variant transition-colors" id="cam-glow-2"></div>
           <div class="relative w-full aspect-video bg-inverse-surface overflow-hidden" id="cam-viewport-2">
             <!-- Populated dynamically with MediaMTX iframe when receiving, or Not Connected picture -->
@@ -381,6 +378,37 @@
             <span class="font-label-sm text-[10px] text-on-surface-variant truncate" id="cam-meta-2">RTMP Preview Feed</span>
             <button type="button" onclick="event.stopPropagation(); toggleCameraStream('cam2')" id="cam-stream-btn-2" class="px-2 py-0.5 rounded bg-surface-container-lowest text-secondary font-label-sm text-[9px] font-bold uppercase shadow-xs">Start Receiving</button>
           </div>
+        </div>
+      </div>
+
+      <!-- ATEM view (double view only): preview/program row, FTB/CUT/AUTO, DSK tie and on air -->
+      <div id="atem-panel" class="bg-surface-container-low rounded-xl p-space-sm shadow-sm border border-outline-variant/30 flex flex-col gap-space-xs">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-primary text-[18px]">switch_video</span>
+            <span class="font-label-md text-label-md text-on-surface font-bold tracking-tight">ATEM</span>
+          </div>
+          <span class="font-label-sm text-[10px] text-on-surface-variant font-bold uppercase" id="atem-status">Connecting...</span>
+        </div>
+        <div class="grid grid-cols-6 gap-1">
+          <button type="button" id="atem-in-1" class="atem-btn" onclick="atemSelectInput(1)">1</button>
+          <button type="button" id="atem-in-2" class="atem-btn" onclick="atemSelectInput(2)">2</button>
+          <button type="button" id="atem-in-3" class="atem-btn" onclick="atemSelectInput(3)">3</button>
+          <button type="button" id="atem-ftb" class="atem-btn atem-btn-text" onclick="atemFtb()">FTB</button>
+          <button type="button" id="atem-cut" class="atem-btn atem-btn-text" onclick="atemCut()">CUT</button>
+          <button type="button" id="atem-auto" class="atem-btn atem-btn-text" onclick="atemAuto()">AUTO</button>
+        </div>
+        <div class="grid grid-cols-2 gap-1 pt-1">
+          <button type="button" id="atem-dsk-1" class="atem-btn atem-dsk" onclick="atemSelectDsk(1)">
+            <span class="atem-dsk-name">DSK 1</span><span class="atem-dsk-sub">Input 4</span>
+          </button>
+          <button type="button" id="atem-dsk-2" class="atem-btn atem-dsk" onclick="atemSelectDsk(2)">
+            <span class="atem-dsk-name">DSK 2</span><span class="atem-dsk-sub">Media player</span>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-1">
+          <button type="button" id="atem-tie" class="atem-btn atem-btn-text" onclick="atemToggleTie()">TIE</button>
+          <button type="button" id="atem-onair" class="atem-btn atem-btn-text" onclick="atemToggleOnAir()">ON AIR</button>
         </div>
       </div>
 
@@ -443,7 +471,6 @@
             <span class="font-label-md text-label-md text-on-surface font-bold tracking-tight" id="cam1-presets-heading">CAM 01 PRESETS</span>
             <span class="font-label-sm text-label-sm text-on-surface-variant" id="cam1-presets-label">(Camera 1)</span>
           </div>
-          <span class="font-label-sm text-[10px] text-primary font-semibold" id="cam1-sf-badge">SmartFrame: OFF</span>
         </div>
         <div class="grid grid-cols-3 gap-space-xs pt-1" id="cam1-presets-grid"></div>
       </div>
@@ -456,13 +483,12 @@
             <span class="font-label-md text-label-md text-on-surface font-bold tracking-tight" id="cam2-presets-heading">CAM 02 PRESETS</span>
             <span class="font-label-sm text-label-sm text-on-surface-variant" id="cam2-presets-label">(Camera 2)</span>
           </div>
-          <span class="font-label-sm text-[10px] text-secondary font-semibold" id="cam2-sf-badge">SmartFrame: OFF</span>
         </div>
         <div class="grid grid-cols-3 gap-space-xs pt-1" id="cam2-presets-grid"></div>
       </div>
 
-      <!-- Shared D-Pad Controller & Zoom / Focus Console -->
-      <div class="bg-surface-container rounded-xl p-space-sm shadow-sm border border-outline-variant/30 flex flex-col gap-space-sm">
+      <!-- Shared D-Pad Controller & Zoom / Focus Console (single view only) -->
+      <div id="ptz-console" class="hidden bg-surface-container rounded-xl p-space-sm shadow-sm border border-outline-variant/30 flex-col gap-space-sm">
         <div class="flex items-center justify-between pb-1">
           <div class="flex items-center gap-space-xs">
             <span class="material-symbols-outlined text-primary text-[20px]">gamepad</span>
@@ -528,18 +554,20 @@
               </div>
             </div>
 
-            <!-- Focus & SmartFrame Bank -->
+            <!-- Focus Bank: autofocus, manual focus, privacy blur -->
             <div class="bg-surface-container-low rounded-xl p-space-xs flex flex-col gap-1">
               <div class="flex items-center justify-between">
-                <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">AI / FOCUS</span>
-                <button type="button" onclick="sendSmartFrame('trigger')" class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-label-sm text-[9px] font-bold uppercase">SMART TRIG</button>
+                <span class="font-label-sm text-label-sm text-on-surface-variant font-semibold">FOCUS</span>
               </div>
               <div class="grid grid-cols-2 gap-1">
-                <button type="button" class="h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all" onclick="sendSmartFrame('enable')">
-                  AI ON
+                <button type="button" id="focus-af-btn" class="h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all" onclick="setFocusMode('auto')">
+                  AUTO
                 </button>
-                <button type="button" class="h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all" onclick="sendSmartFrame('disable')">
-                  AI OFF
+                <button type="button" id="focus-mf-btn" class="h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all" onclick="setFocusMode('manual')">
+                  MANUAL
+                </button>
+                <button type="button" id="privacy-blur-btn" class="col-span-2 h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center gap-1 text-center leading-tight active:scale-95 transition-all" onclick="togglePrivacyBlur()">
+                  <span class="material-symbols-outlined text-[15px]">blur_on</span> PRIVACY BLUR
                 </button>
               </div>
             </div>
@@ -741,6 +769,13 @@
         </button>
       </div>
 
+      <!-- Tabs: Crop (per input) and Composite (slide frame) -->
+      <div class="flex bg-surface-container-highest rounded-lg p-0.5" role="tablist">
+        <button type="button" role="tab" id="crop-tab-crop" class="flex-1 px-2 py-1 rounded font-label-sm text-[11px] uppercase font-bold bg-surface text-primary shadow-sm" onclick="setCropDialogTab('crop')">Crop</button>
+        <button type="button" role="tab" id="crop-tab-composite" class="flex-1 px-2 py-1 rounded font-label-sm text-[11px] uppercase text-on-surface-variant" onclick="setCropDialogTab('composite')">Composite</button>
+      </div>
+
+      <div id="crop-pane-crop" class="space-y-2.5">
       <!-- 1. TOP PANE: Duplicated Cropped Output Feed (Unobstructed by Finger!) -->
       <div class="space-y-1">
         <div class="flex items-center justify-between">
@@ -829,6 +864,97 @@
           </div>
         </div>
       </div>
+      </div>
+
+      <div id="crop-pane-composite" class="hidden space-y-2.5">
+        <!-- Target composite and run state -->
+        <div class="flex items-center gap-1.5">
+          <div class="flex flex-1 bg-surface-container-highest rounded-lg p-0.5">
+            <button type="button" id="comp-target-compose1" class="flex-1 px-1.5 py-1 rounded font-label-sm text-[10px] uppercase font-bold bg-surface text-primary shadow-sm" onclick="compSelectTarget('compose1')">compose1 • HDMI key</button>
+            <button type="button" id="comp-target-compose2" class="flex-1 px-1.5 py-1 rounded font-label-sm text-[10px] uppercase text-on-surface-variant" onclick="compSelectTarget('compose2')">compose2 • ATEM media</button>
+          </div>
+          <button type="button" id="comp-run-btn" class="px-3 h-8 rounded-lg bg-primary text-on-primary font-label-sm text-[10px] font-bold uppercase active:scale-95" onclick="compToggleRun()">Start</button>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant" id="comp-status">Loading...</span>
+          <span class="font-label-sm text-[9px] text-on-surface-variant font-mono" id="comp-readout">left • 10:16 • 100% • Y 0%</span>
+        </div>
+
+        <!-- 1. Output preview (the key page as pimatrix renders it) -->
+        <div class="space-y-1">
+          <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-primary flex items-center gap-1">
+            <span class="material-symbols-outlined text-[12px]">visibility</span>
+            Composite Output Preview
+          </span>
+          <div class="w-full h-32 rounded-xl bg-inverse-surface border border-outline-variant/40 flex items-center justify-center overflow-hidden relative shadow-inner">
+            <img id="comp-preview-img" alt="Composite output preview" class="hidden w-full h-full object-contain">
+            <span id="comp-preview-empty" class="font-label-sm text-[10px] text-inverse-on-surface/70 uppercase px-3 text-center">No preview yet. Send a slide first.</span>
+          </div>
+        </div>
+
+        <!-- 2. Interactive frame: drag the slide -->
+        <div class="space-y-1">
+          <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant flex items-center gap-1">
+            <span class="material-symbols-outlined text-[12px]">pan_tool_alt</span>
+            Interactive Frame (Drag The Slide)
+          </span>
+          <div id="comp-frame" class="w-full aspect-video rounded-xl border border-outline-variant/40 relative overflow-hidden cursor-grab active:cursor-grabbing touch-none shadow-inner">
+            <div id="comp-slide" class="absolute border-2 border-dashed border-primary bg-primary/25 pointer-events-none flex items-start justify-between p-1">
+              <span id="comp-slide-tag" class="px-1.5 py-0.5 rounded bg-primary text-on-primary font-label-sm text-[9px] font-bold uppercase shadow-xs">SLIDE</span>
+              <span class="material-symbols-outlined text-[14px] text-white/90 drop-shadow">open_with</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Presets -->
+        <div class="space-y-1">
+          <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Presets</span>
+          <div class="grid grid-cols-5 gap-1.5">
+            <button type="button" id="comp-preset-left" onclick="compPreset('left')" class="h-8 px-1.5 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase transition-all active:scale-95">Left</button>
+            <button type="button" id="comp-preset-right" onclick="compPreset('right')" class="h-8 px-1.5 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase transition-all active:scale-95">Right</button>
+            <button type="button" id="comp-preset-10-16" onclick="compPreset('10:16')" class="h-8 px-1.5 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase transition-all active:scale-95">10:16</button>
+            <button type="button" id="comp-preset-9-16" onclick="compPreset('9:16')" class="h-8 px-1.5 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase transition-all active:scale-95">9:16</button>
+            <button type="button" onclick="compPreset('reset')" class="h-8 px-1.5 rounded-lg bg-error-container text-on-error-container font-label-sm text-[10px] font-bold uppercase transition-all active:scale-95">Reset</button>
+          </div>
+        </div>
+
+        <!-- 4. Nudge and size -->
+        <div class="flex items-center justify-between gap-3 pt-1 border-t border-outline-variant/30">
+          <div class="grid grid-cols-3 gap-1 w-28 flex-shrink-0">
+            <div></div>
+            <button type="button" onclick="compMove('up')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
+              <span class="material-symbols-outlined text-[15px]">keyboard_arrow_up</span>
+            </button>
+            <div></div>
+            <button type="button" onclick="compMove('left')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
+              <span class="material-symbols-outlined text-[15px]">keyboard_arrow_left</span>
+            </button>
+            <button type="button" onclick="compMove('center')" class="h-7 rounded bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[9px] font-bold flex items-center justify-center active:scale-95" title="Centre vertically">CTR</button>
+            <button type="button" onclick="compMove('right')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
+              <span class="material-symbols-outlined text-[15px]">keyboard_arrow_right</span>
+            </button>
+            <div></div>
+            <button type="button" onclick="compMove('down')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
+              <span class="material-symbols-outlined text-[15px]">keyboard_arrow_down</span>
+            </button>
+            <div></div>
+          </div>
+          <div class="flex flex-col gap-1.5 flex-1">
+            <div class="grid grid-cols-2 gap-1.5">
+              <button type="button" onclick="compResize('in')" class="h-8 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase flex items-center justify-center gap-1 active:scale-95">
+                <span class="material-symbols-outlined text-[14px]">zoom_out</span>Smaller
+              </button>
+              <button type="button" onclick="compResize('out')" class="h-8 rounded-lg bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[10px] font-bold uppercase flex items-center justify-center gap-1 active:scale-95">
+                <span class="material-symbols-outlined text-[14px]">zoom_in</span>Larger
+              </button>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <a href="/composite.html" class="flex-1 h-8 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-[10px] font-bold uppercase flex items-center justify-center gap-1 active:scale-95" title="Key colour, slide upload, ATEM media slot and more">More settings</a>
+              <button type="button" onclick="closeCropModal()" class="px-3 h-8 rounded-lg bg-primary text-on-primary font-label-sm text-[10px] font-bold uppercase">Done</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </dialog>
 
@@ -851,7 +977,7 @@
       </a>
       <a href="#cameras" id="nav-cameras" onclick="switchTab('cameras'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">videocam</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Cameras</span>
+        <span class="font-label-sm text-label-sm uppercase tracking-wider">Video</span>
       </a>
       <a href="#renderer" id="nav-renderer" onclick="switchTab('renderer'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">layers</span>
