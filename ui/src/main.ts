@@ -1,4 +1,6 @@
 import "./styles.css";
+import { initAtemView, setAtemActive } from "./atem";
+import { initCompositeTab } from "./composite-tab";
 
 // Global Fetch Interceptor for Authentication
 const originalFetch = window.fetch.bind(window);
@@ -257,15 +259,10 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   const title = document.getElementById("header-title");
   const subtitle = document.getElementById("header-subtitle");
   const lockBtn = document.getElementById("lockToggleBtn");
-  const camViewBtn = document.getElementById("toggleViewBtn");
 
   if (lockBtn) {
     lockBtn.classList.toggle("hidden", tab !== "inputs");
     lockBtn.classList.toggle("flex", tab === "inputs");
-  }
-  if (camViewBtn) {
-    camViewBtn.classList.toggle("hidden", tab !== "cameras");
-    camViewBtn.classList.toggle("flex", tab === "cameras");
   }
 
   if (tab === "outputs") {
@@ -278,13 +275,15 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (subtitle) subtitle.textContent = "Atlona 4x4 Switcher";
   } else if (tab === "cameras") {
     if (icon) icon.textContent = "videocam";
-    if (title) title.textContent = "Camera Control";
-    if (subtitle) subtitle.textContent = "PTZ Optics & Presets";
+    if (title) title.textContent = "Video";
+    if (subtitle) subtitle.textContent = "Cameras, Presets & ATEM";
   } else if (tab === "renderer") {
     if (icon) icon.textContent = "layers";
     if (title) title.textContent = "PiPGM Renderer";
     if (subtitle) subtitle.textContent = "Stub Placeholder";
   }
+
+  updateAtemPolling();
 
   if (pushUrl && window.history && window.history.replaceState) {
     const pathMap: Record<FrontendTabId, string> = {
@@ -751,6 +750,7 @@ function openOutputCropModal(outputNum: 1 | 2): void {
 
 function openSourceCropModal(sourceId: SourceId): void {
   activeCropSourceId = sourceId;
+  window.setCropDialogTab("crop");
   ensureSourceEffects(sourceId);
   renderCropModal();
   const dialog = document.getElementById("crop-modal-overlay") as HTMLDialogElement | null;
@@ -766,6 +766,7 @@ function closeCropModal(): void {
   if (dialog && dialog.open) {
     dialog.close();
   }
+  window.setCropDialogTab("crop");
   activeCropSourceId = null;
 }
 
@@ -1399,21 +1400,19 @@ async function routeMatrixCrosspoint(input: number, output: number): Promise<voi
 // ============================================================================
 // Tab 3: Camera Control (Overview & Single-View Parameter Matrix + Presets)
 // ============================================================================
-function selectCamera(camId: "cam1" | "cam2"): void {
-  selectedCameraId = camId;
-  renderCamerasTab();
-}
-
-function toggleCamFocus(): void {
+/** Tap a camera view to enter single view, tap it again to go back to double view. */
+function tapCameraCard(camId: "cam1" | "cam2"): void {
   if (camFocusMode === "dual") {
-    camFocusMode = selectedCameraId;
-  } else if (camFocusMode === "cam1") {
-    camFocusMode = "cam2";
-    selectedCameraId = "cam2";
+    camFocusMode = camId;
+    selectedCameraId = camId;
   } else {
     camFocusMode = "dual";
   }
   renderCamerasTab();
+}
+
+function updateAtemPolling(): void {
+  setAtemActive(activeTab === "cameras" && camFocusMode === "dual");
 }
 
 function renderCameraFeedViewport(camId: "cam1" | "cam2", idx: 1 | 2): void {
@@ -1455,7 +1454,8 @@ function renderCamerasTab(): void {
   const cam2PresetsLabel = document.getElementById("cam2-presets-label");
   const targetInd = document.getElementById("target-indicator");
   const paramTitle = document.getElementById("param-matrix-title");
-  const viewModeLabel = document.getElementById("viewModeLabel");
+  const atemPanel = document.getElementById("atem-panel");
+  const ptzConsole = document.getElementById("ptz-console");
   const monitorsContainer = document.getElementById("monitorsContainer");
   const expandedConfigPanel = document.getElementById("expandedConfigPanel");
   const cam1PresetsSection = document.getElementById("cam1-presets-section");
@@ -1499,7 +1499,6 @@ function renderCamerasTab(): void {
       monitorsContainer.className = "grid grid-cols-2 gap-space-sm w-full transition-all duration-300";
       card1.classList.remove("hidden");
       card2.classList.remove("hidden");
-      if (viewModeLabel) viewModeLabel.textContent = "Dual View";
       if (expandedConfigPanel) {
         expandedConfigPanel.classList.add("hidden");
         expandedConfigPanel.classList.remove("flex");
@@ -1510,7 +1509,6 @@ function renderCamerasTab(): void {
       monitorsContainer.className = "grid grid-cols-1 gap-space-sm w-full transition-all duration-300";
       card1.classList.remove("hidden");
       card2.classList.add("hidden");
-      if (viewModeLabel) viewModeLabel.textContent = "CAM 01 Focus";
       if (expandedConfigPanel) {
         expandedConfigPanel.classList.remove("hidden");
         expandedConfigPanel.classList.add("flex");
@@ -1521,7 +1519,6 @@ function renderCamerasTab(): void {
       monitorsContainer.className = "grid grid-cols-1 gap-space-sm w-full transition-all duration-300";
       card1.classList.add("hidden");
       card2.classList.remove("hidden");
-      if (viewModeLabel) viewModeLabel.textContent = "CAM 02 Focus";
       if (expandedConfigPanel) {
         expandedConfigPanel.classList.remove("hidden");
         expandedConfigPanel.classList.add("flex");
@@ -1530,6 +1527,19 @@ function renderCamerasTab(): void {
       if (cam2PresetsSection) cam2PresetsSection.classList.remove("hidden");
     }
   }
+
+  // ATEM view belongs to double view, PTZ movement and focus to single view.
+  const isDual = camFocusMode === "dual";
+  if (atemPanel) {
+    atemPanel.classList.toggle("hidden", !isDual);
+    atemPanel.classList.toggle("flex", isDual);
+  }
+  if (ptzConsole) {
+    ptzConsole.classList.toggle("hidden", isDual);
+    ptzConsole.classList.toggle("flex", !isDual);
+  }
+  updateAtemPolling();
+  renderFocusButtons();
 
   // Update each camera's telemetry, feed viewport, and Start/Stop Receiving button
   (["cam1", "cam2"] as const).forEach((camId, idx) => {
@@ -1541,11 +1551,6 @@ function renderCamerasTab(): void {
     const posEl = document.getElementById(`cam-pos-${n}`);
     if (posEl && cam.position) {
       posEl.textContent = `P:${cam.position.pan} T:${cam.position.tilt} Z:${cam.position.zoom}`;
-    }
-
-    const sfBadge = document.getElementById(`cam${n}-sf-badge`);
-    if (sfBadge) {
-      sfBadge.textContent = `SmartFrame: ${(cam.smartFrame || "disabled").toUpperCase()}`;
     }
 
     const streamBtn = document.getElementById(`cam-stream-btn-${n}`);
@@ -1953,22 +1958,63 @@ async function sendPTZZoom(action: "in" | "out" | "stop"): Promise<void> {
   }
 }
 
-async function sendSmartFrame(mode: "enable" | "disable" | "trigger"): Promise<void> {
+const FOCUS_ON = "h-10 rounded-lg bg-primary text-on-primary font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all";
+const FOCUS_OFF = "h-10 rounded-lg bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-md text-[10px] font-semibold flex items-center justify-center text-center leading-tight active:scale-95 transition-all";
+
+function renderFocusButtons(): void {
+  const cam = camerasMap.get(selectedCameraId);
+  const blur = cam?.privacyBlur === true;
+  const manual = cam?.focusMode === "manual";
+  const af = document.getElementById("focus-af-btn");
+  const mf = document.getElementById("focus-mf-btn");
+  const pb = document.getElementById("privacy-blur-btn");
+  if (af) af.className = !blur && !manual ? FOCUS_ON : FOCUS_OFF;
+  if (mf) mf.className = !blur && manual ? FOCUS_ON : FOCUS_OFF;
+  if (pb) pb.className = `col-span-2 gap-1 ${blur ? FOCUS_ON : FOCUS_OFF}`;
+}
+
+async function refreshCamera(camId: "cam1" | "cam2"): Promise<void> {
+  const camRes = await fetch(`/api/v1/cameras/${camId}`);
+  if (camRes.ok) camerasMap.set(camId, (await camRes.json()) as CameraSnapshot);
+  renderCamerasTab();
+}
+
+async function setFocusMode(mode: "auto" | "manual"): Promise<void> {
   const camId = selectedCameraId;
   try {
-    const res = await fetch(`/api/v1/cameras/${camId}/smartframe`, {
+    const res = await fetch(`/api/v1/cameras/${camId}/focus`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode })
     });
     if (res.ok) {
-      const camRes = await fetch(`/api/v1/cameras/${camId}`);
-      if (camRes.ok) camerasMap.set(camId, (await camRes.json()) as CameraSnapshot);
-      renderCamerasTab();
-      showToast(`${camId.toUpperCase()} SmartFrame: ${mode.toUpperCase()}`);
+      await refreshCamera(camId);
+      showToast(`${camId.toUpperCase()} focus: ${mode.toUpperCase()}`);
+    } else {
+      showToast("Focus command failed");
     }
   } catch {
-    showToast("SmartFrame command failed");
+    showToast("Focus command failed");
+  }
+}
+
+async function togglePrivacyBlur(): Promise<void> {
+  const camId = selectedCameraId;
+  const enabled = camerasMap.get(camId)?.privacyBlur !== true;
+  try {
+    const res = await fetch(`/api/v1/cameras/${camId}/privacy-blur`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled })
+    });
+    if (res.ok) {
+      await refreshCamera(camId);
+      showToast(`${camId.toUpperCase()} privacy blur ${enabled ? "ON" : "OFF"}`);
+    } else {
+      showToast("Privacy blur failed");
+    }
+  } catch {
+    showToast("Privacy blur failed");
   }
 }
 
@@ -2168,12 +2214,16 @@ function connectSse(): void {
         position?: { pan: number; tilt: number; zoom: number };
         streaming?: boolean;
         smartFrame?: CameraSnapshot["smartFrame"];
+        privacyBlur?: boolean;
+        focusMode?: "auto" | "manual";
       };
       const cam = camerasMap.get(payload.id);
       if (cam) {
         if (payload.position) cam.position = payload.position;
         if (typeof payload.streaming === "boolean") cam.streaming = payload.streaming;
         if (payload.smartFrame) cam.smartFrame = payload.smartFrame;
+        if (typeof payload.privacyBlur === "boolean") cam.privacyBlur = payload.privacyBlur;
+        if (payload.focusMode) cam.focusMode = payload.focusMode;
         renderCamerasTab();
       }
     } catch {
@@ -2217,8 +2267,7 @@ window.updateRtspCustomQuality = updateRtspCustomQuality;
 window.toggleRtspStream = toggleRtspStream;
 window.toggleMatrixLock = toggleMatrixLock;
 window.routeMatrixCrosspoint = routeMatrixCrosspoint;
-window.selectCamera = selectCamera;
-window.toggleCamFocus = toggleCamFocus;
+window.tapCameraCard = tapCameraCard;
 window.toggleCameraStream = toggleCameraStream;
 window.toggleSavePresetMode = toggleSavePresetMode;
 window.setPresetViewMode = setPresetViewMode;
@@ -2226,7 +2275,8 @@ window.renderCameraPresets = renderCameraPresets;
 window.handlePresetTap = handlePresetTap;
 window.sendPTZMove = sendPTZMove;
 window.sendPTZZoom = sendPTZZoom;
-window.sendSmartFrame = sendSmartFrame;
+window.setFocusMode = setFocusMode;
+window.togglePrivacyBlur = togglePrivacyBlur;
 window.adjustPtzSpeed = adjustPtzSpeed;
 
 
@@ -2387,6 +2437,9 @@ async function bootstrap(): Promise<void> {
   bindOutputHeadersLongPressForCrop();
   bindCropInteractiveDrag();
   bindThumbCaptureButton();
+  document.getElementById("crop-modal-overlay")?.addEventListener("close", () => window.setCropDialogTab("crop"));
+  initAtemView(showToast);
+  initCompositeTab(showToast);
 
   await fetchInitialFromApiIfNeeded();
   syncCameraLabelsFromEnvAndBackend();

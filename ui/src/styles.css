@@ -59,3 +59,32 @@ dialog.broadcast-dialog::backdrop {
   background-color: rgba(31, 27, 23, 0.45);
   backdrop-filter: blur(4px);
 }
+
+/* ATEM view: preview is green, program is red, tie is amber (as on the switcher). */
+.atem-btn {
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: #e8e1da;
+  color: #1f1b17;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, background-color 0.15s;
+}
+.atem-btn:active { transform: scale(0.95); }
+.atem-btn:disabled { opacity: 0.45; }
+.atem-btn-text { font-size: 0.7rem; letter-spacing: 0.04em; }
+.atem-btn.atem-pvw { background: #16a34a; color: #fff; }
+.atem-btn.atem-pgm { background: #dc2626; color: #fff; }
+.atem-btn.atem-tie { background: #f59e0b; color: #1f1b17; }
+.atem-btn.atem-pulse { animation: atem-pulse 0.6s ease-in-out infinite alternate; }
+.atem-btn.atem-selected { outline: 2px solid #1f1b17; outline-offset: 1px; }
+.atem-dsk { flex-direction: column; line-height: 1.1; height: 3rem; }
+.atem-dsk-name { font-size: 0.8rem; font-weight: 700; }
+.atem-dsk-sub { font-size: 0.6rem; font-weight: 500; opacity: 0.75; text-transform: uppercase; }
+@keyframes atem-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+
+/* The Crop & Effects dialog scrolls on short phones (the Composite tab is taller). */
+#crop-modal-overlay > div { max-height: calc(100dvh - 2rem); overflow-y: auto; }

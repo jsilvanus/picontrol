@@ -28,6 +28,8 @@ export interface Composite {
   side: CompositeSide;
   slideAspect: SlideAspect;
   slideScale: number;
+  /** -1 top edge, 0 centred, 1 bottom edge. */
+  offsetY: number;
   keyColor: string;
   keyMode: KeyMode;
   atem: CompositeAtem;
@@ -52,6 +54,7 @@ export interface CompositePatch {
   side?: CompositeSide;
   slideAspect?: SlideAspect;
   slideScale?: number;
+  offsetY?: number;
   keyColor?: string;
   keyMode?: KeyMode;
   atem?: Partial<CompositeAtem>;

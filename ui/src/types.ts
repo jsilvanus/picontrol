@@ -71,6 +71,9 @@ export interface CameraSnapshot {
   streaming: boolean;
   streamUrl: string | null;
   smartFrame: "enabled" | "disabled" | "triggered" | "unsupported";
+  /** True while the privacy blur (manual focus driven near) is on. */
+  privacyBlur?: boolean;
+  focusMode?: "auto" | "manual";
   position: CameraPosition;
   presets: CameraPreset[];
 }
@@ -152,8 +155,7 @@ declare global {
     toggleRtspStream: () => Promise<void>;
     toggleMatrixLock: () => Promise<void>;
     routeMatrixCrosspoint: (input: number, output: number) => Promise<void>;
-    selectCamera: (camId: "cam1" | "cam2") => void;
-    toggleCamFocus: () => void;
+    tapCameraCard: (camId: "cam1" | "cam2") => void;
     toggleCameraStream: (camId: "cam1" | "cam2") => Promise<void>;
     toggleSavePresetMode: () => void;
     setPresetViewMode: (mode: "name" | "number" | "thumb") => void;
@@ -161,7 +163,21 @@ declare global {
     handlePresetTap: (camId: "cam1" | "cam2", presetId: number) => Promise<void>;
     sendPTZMove: (direction: string) => Promise<void>;
     sendPTZZoom: (action: "in" | "out" | "stop") => Promise<void>;
-    sendSmartFrame: (mode: "enable" | "disable" | "trigger") => Promise<void>;
+    setFocusMode: (mode: "auto" | "manual") => Promise<void>;
+    togglePrivacyBlur: () => Promise<void>;
+    atemSelectInput: (input: number) => Promise<void>;
+    atemFtb: () => Promise<void>;
+    atemCut: () => Promise<void>;
+    atemAuto: () => Promise<void>;
+    atemSelectDsk: (dsk: number) => void;
+    atemToggleTie: () => Promise<void>;
+    atemToggleOnAir: () => Promise<void>;
+    setCropDialogTab: (tab: "crop" | "composite") => void;
+    compSelectTarget: (id: "compose1" | "compose2") => Promise<void>;
+    compToggleRun: () => Promise<void>;
+    compPreset: (preset: "left" | "right" | "10:16" | "9:16" | "reset") => Promise<void>;
+    compMove: (direction: "left" | "right" | "up" | "down" | "center") => Promise<void>;
+    compResize: (action: "in" | "out") => Promise<void>;
     adjustPtzSpeed: (delta: number) => void;
   }
 }
