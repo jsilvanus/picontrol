@@ -1,5 +1,6 @@
 import "./styles.css";
 import { initAtemView, setAtemActive } from "./atem";
+import { bindBackdropDismiss } from "./dialog-dismiss";
 import { initQuickOptions } from "./quick-options";
 import { initCompositeTab, setCompositeContext } from "./composite-tab";
 
@@ -2084,13 +2085,7 @@ function adjustPtzSpeed(delta: number): void {
 // Dialog light-dismiss backdrop fallback
 // ============================================================================
 function bindDialogBackdropDismiss(dialogId: string): void {
-  const dialog = document.getElementById(dialogId) as HTMLDialogElement | null;
-  if (!dialog) return;
-  dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) {
-      dialog.close();
-    }
-  });
+  bindBackdropDismiss(document.getElementById(dialogId) as HTMLDialogElement | null);
 }
 
 // ============================================================================
@@ -2474,6 +2469,7 @@ async function bootstrap(): Promise<void> {
   bindDialogBackdropDismiss("aux-modal-overlay");
   bindDialogBackdropDismiss("rtsp-modal-overlay");
   bindDialogBackdropDismiss("crop-modal-overlay");
+  bindDialogBackdropDismiss("comp-settings-modal");
   bindOutputHeadersLongPressForCrop();
   bindCropInteractiveDrag();
   bindThumbCaptureButton();
