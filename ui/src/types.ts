@@ -11,7 +11,8 @@ export type SourceId =
   | "cam3"
   | "PiPGM1"
   | "PiPGM2"
-  | "PiPGM3";
+  | "PiPGM3"
+  | "compose1";
 
 export interface SourceItem {
   id: SourceId;

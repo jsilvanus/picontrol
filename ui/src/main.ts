@@ -37,8 +37,8 @@ import type {
   SourceItem
 } from "./types.js";
 
-const DIRECT_HDMI_SOURCES = new Set(["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2"]);
-const DIRECT_HDMI_SOURCE_LIST: SourceId[] = ["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2"];
+const DIRECT_HDMI_SOURCES = new Set(["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2", "compose1"]);
+const DIRECT_HDMI_SOURCE_LIST: SourceId[] = ["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2", "compose1"];
 const AUX_CAMERA_SOURCE_LIST: SourceId[] = ["cam1", "cam2", "cam3"];
 const AUX_SOURCE_LIST: SourceId[] = ["cam1", "cam2", "cam3", "PiPGM3"];
 // NOTE: Future `hama2` source will be added alongside `hama` so we can route uncropped `hama`
@@ -54,6 +54,7 @@ const SOURCE_LABELS: Record<string, string> = {
   PiPGM1: "pipgm 1",
   PiPGM2: "pipgm 2",
   PiPGM3: "pipgm 3",
+  compose1: "compose 1",
   cam1: viteEnv.VITE_CAM1_NAME?.trim() || "cam1",
   cam2: viteEnv.VITE_CAM2_NAME?.trim() || "cam2",
   cam3: viteEnv.VITE_CAM3_NAME?.trim() || "cam3",
@@ -363,6 +364,8 @@ function buildInputRowWithInlineControls(
   const srcCropped = isSourceCropped(src);
   const cropRatio = getSourceCropAspect(src);
   const selectCall = onSelectExpr || `selectHdmiSource(${outputNum}, '${src}')`;
+  // compose1 is a slide-only key page: no video or audio, so no mute/FTB; hold opens the Composite tab.
+  const isCompose = src === "compose1";
 
   const rowBg = isSelected
     ? "bg-primary text-on-primary shadow-sm border-primary"
@@ -400,7 +403,7 @@ function buildInputRowWithInlineControls(
         </span>
         <span class="flex items-center gap-1 flex-shrink-0">${cropBadgeHtml}</span>
       </button>
-      <div class="flex items-center gap-0.5 pr-0.5 flex-shrink-0">
+      ${isCompose ? "" : `<div class="flex items-center gap-0.5 pr-0.5 flex-shrink-0">
         <button
           type="button"
           onclick="event.stopPropagation(); toggleInputEffect('${src}', 'mute')"
@@ -417,7 +420,7 @@ function buildInputRowWithInlineControls(
         >
           FTB
         </button>
-      </div>
+      </div>`}
     </div>
   `;
 }
@@ -750,7 +753,7 @@ function openOutputCropModal(outputNum: 1 | 2): void {
 
 function openSourceCropModal(sourceId: SourceId): void {
   activeCropSourceId = sourceId;
-  window.setCropDialogTab("crop");
+  window.setCropDialogTab(sourceId === "compose1" ? "composite" : "crop");
   ensureSourceEffects(sourceId);
   renderCropModal();
   const dialog = document.getElementById("crop-modal-overlay") as HTMLDialogElement | null;
