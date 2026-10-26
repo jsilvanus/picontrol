@@ -17,6 +17,9 @@ let comp: Composite | null = null;
 let previewUrl: string | null = null;
 let previewTimer: ReturnType<typeof setTimeout> | null = null;
 let loadSeq = 0;
+/** The source that was long-pressed to open the dialog (null = opened some other way). */
+let context: string | null = null;
+const PIPGM_IDS: readonly string[] = ["PiPGM1", "PiPGM2", "PiPGM3"];
 
 const COMPOSITE_PATH = "/api/v1/composites";
 
@@ -95,6 +98,7 @@ function render(): void {
     if (status) status.textContent = "Loading...";
     return;
   }
+  renderInput();
   if (status) {
     const parts: string[] = [comp.enabled ? comp.state : "stopped"];
     if (!comp.hasSlide) parts.push("no slide yet");
@@ -137,6 +141,38 @@ function render(): void {
     b?.classList.toggle("ring-2", active);
     b?.classList.toggle("ring-primary", active);
   }
+}
+
+/** The value of the Input dropdown for a composite: "upload" or the followed pipeline. */
+function inputOf(c: Composite): string {
+  return c.slideSource === "piprogram" ? c.pipelineId : "upload";
+}
+
+/** Input dropdown, and the blurred "move composite here" cover for another source. */
+function renderInput(): void {
+  const select = byId<HTMLSelectElement>("comp-input-select");
+  if (select && comp) select.value = inputOf(comp);
+  const overlay = byId("comp-move-overlay");
+  if (!overlay) return;
+  const other = comp !== null && context !== null && context !== "compose1" && context !== "compose2" && inputOf(comp) !== context;
+  overlay.classList.toggle("hidden", !other);
+  overlay.classList.toggle("flex", other);
+  const text = byId("comp-move-text");
+  const btn = byId<HTMLButtonElement>("comp-move-btn");
+  if (!other || !comp) return;
+  const movable = context !== null && PIPGM_IDS.includes(context);
+  if (text) {
+    text.textContent = movable
+      ? `Composite input is ${inputOf(comp) === "upload" ? "an uploaded slide" : inputOf(comp)}`
+      : "Only piprogram sources can feed the composite";
+  }
+  if (btn) btn.classList.toggle("hidden", !movable);
+}
+
+/** Records which source opened the dialog; the composite tab reacts on its next render. */
+export function setCompositeContext(sourceId: string | null): void {
+  context = sourceId;
+  renderInput();
 }
 
 function showPreviewEmpty(text: string): void {
@@ -258,6 +294,12 @@ function bindDrag(): void {
 }
 
 export function initCompositeTab(showToast: (message: string) => void): void {
+  window.compSelectInput = async (value) => {
+    await patch(value === "upload" ? { slideSource: "upload" } : { slideSource: "piprogram", pipelineId: value as Composite["pipelineId"] });
+  };
+  window.compMoveHere = async () => {
+    if (context && PIPGM_IDS.includes(context)) await window.compSelectInput(context);
+  };
   toast = showToast;
   bindDrag();
 

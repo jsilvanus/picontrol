@@ -174,6 +174,8 @@ declare global {
     atemToggleTie: () => Promise<void>;
     atemToggleOnAir: () => Promise<void>;
     setCropDialogTab: (tab: "crop" | "composite") => void;
+    compSelectInput: (value: string) => Promise<void>;
+    compMoveHere: () => Promise<void>;
     compSelectTarget: (id: "compose1" | "compose2") => Promise<void>;
     compToggleRun: () => Promise<void>;
     compPreset: (preset: "left" | "right" | "10:16" | "9:16" | "reset") => Promise<void>;

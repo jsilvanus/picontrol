@@ -1,6 +1,6 @@
 import "./styles.css";
 import { initAtemView, setAtemActive } from "./atem";
-import { initCompositeTab } from "./composite-tab";
+import { initCompositeTab, setCompositeContext } from "./composite-tab";
 
 // Global Fetch Interceptor for Authentication
 const originalFetch = window.fetch.bind(window);
@@ -36,6 +36,8 @@ import type {
   SourceId,
   SourceItem
 } from "./types.js";
+
+let composeKeyColor = "#00ff00";
 
 const DIRECT_HDMI_SOURCES = new Set(["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2", "compose1"]);
 const DIRECT_HDMI_SOURCE_LIST: SourceId[] = ["hama", "rtmp1", "rtmp2", "PiPGM1", "PiPGM2", "compose1"];
@@ -403,24 +405,34 @@ function buildInputRowWithInlineControls(
         </span>
         <span class="flex items-center gap-1 flex-shrink-0">${cropBadgeHtml}</span>
       </button>
-      ${isCompose ? "" : `<div class="flex items-center gap-0.5 pr-0.5 flex-shrink-0">
-        <button
+      <div class="flex items-center gap-0.5 pr-0.5 flex-shrink-0">
+        ${isCompose
+          ? `<button
+          type="button"
+          disabled
+          title="COMPOSE 1 is always muted (slide only, no audio)"
+          class="w-6 h-6 rounded flex items-center justify-center bg-tertiary text-on-tertiary opacity-70 cursor-not-allowed"
+        >
+          <span class="material-symbols-outlined text-[13px]">volume_off</span>
+        </button>`
+          : `<button
           type="button"
           onclick="event.stopPropagation(); toggleInputEffect('${src}', 'mute')"
           title="${srcMuted ? "Unmute" : "Mute"} ${label.toUpperCase()} (can pre-mute before activating)"
           class="w-6 h-6 rounded flex items-center justify-center transition-all active:scale-90 ${muteBtnClass}"
         >
           <span class="material-symbols-outlined text-[13px]">${srcMuted ? "volume_off" : "volume_up"}</span>
-        </button>
+        </button>`}
         <button
           type="button"
           onclick="event.stopPropagation(); toggleInputEffect('${src}', 'ftb')"
-          title="${srcFtb ? "Disable FTB on" : "Pre-FTB / Fade to Black"} ${label.toUpperCase()}"
-          class="px-1.5 h-6 rounded font-label-sm text-[9px] font-bold uppercase flex items-center justify-center transition-all active:scale-90 ${ftbBtnClass}"
+          title="${isCompose ? (srcFtb ? "Disable FTB on" : "Fade to the key colour:") : srcFtb ? "Disable FTB on" : "Pre-FTB / Fade to Black"} ${label.toUpperCase()}"
+          ${isCompose && srcFtb ? `style="background:${composeKeyColor};color:#000"` : ""}
+          class="px-1.5 h-6 rounded font-label-sm text-[9px] font-bold uppercase flex items-center justify-center transition-all active:scale-90 ${isCompose && srcFtb ? "animate-pulse" : ftbBtnClass}"
         >
           FTB
         </button>
-      </div>`}
+      </div>
     </div>
   `;
 }
@@ -753,6 +765,7 @@ function openOutputCropModal(outputNum: 1 | 2): void {
 
 function openSourceCropModal(sourceId: SourceId): void {
   activeCropSourceId = sourceId;
+  setCompositeContext(sourceId);
   window.setCropDialogTab(sourceId === "compose1" ? "composite" : "crop");
   ensureSourceEffects(sourceId);
   renderCropModal();
@@ -770,6 +783,7 @@ function closeCropModal(): void {
     dialog.close();
   }
   window.setCropDialogTab("crop");
+  setCompositeContext(null);
   activeCropSourceId = null;
 }
 
@@ -2454,6 +2468,15 @@ async function bootstrap(): Promise<void> {
   document.getElementById("crop-modal-overlay")?.addEventListener("close", () => window.setCropDialogTab("crop"));
   initAtemView(showToast);
   initCompositeTab(showToast);
+  void fetch("/api/v1/composites/compose1")
+    .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
+    .then((c) => {
+      if (c?.keyColor) {
+        composeKeyColor = c.keyColor;
+        renderOutputsTab();
+      }
+    })
+    .catch(() => undefined);
 
   await fetchInitialFromApiIfNeeded();
   syncCameraLabelsFromEnvAndBackend();
