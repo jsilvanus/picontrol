@@ -1,5 +1,6 @@
 import "./styles.css";
 import { initAtemView, setAtemActive } from "./atem";
+import { initQuickOptions } from "./quick-options";
 import { initCompositeTab, setCompositeContext } from "./composite-tab";
 
 // Global Fetch Interceptor for Authentication
@@ -2153,6 +2154,17 @@ async function fetchInitialFromApiIfNeeded(): Promise<void> {
   }
 }
 
+/** Re-reads outputs and effects after the backend changed them (a quick option was applied). */
+async function refreshOutputsState(): Promise<void> {
+  const [outRes, fxRes] = await Promise.all([
+    fetch("/api/v1/outputs").catch(() => null),
+    fetch("/api/v1/effects?includeHidden=true").catch(() => null)
+  ]);
+  if (outRes?.ok) ((await outRes.json()) as { items: OutputSnapshot[] }).items.forEach((o) => outputsMap.set(o.id, o));
+  if (fxRes?.ok) ((await fxRes.json()) as { items: EffectsPipeline[] }).items.forEach((e) => effectsMap.set(e.sourceId, e));
+  renderOutputsTab();
+}
+
 function connectSse(): void {
   const sse = new EventSource("/api/v1/events");
   const sseDot = document.getElementById("sse-dot");
@@ -2468,6 +2480,7 @@ async function bootstrap(): Promise<void> {
   document.getElementById("crop-modal-overlay")?.addEventListener("close", () => window.setCropDialogTab("crop"));
   initAtemView(showToast);
   initCompositeTab(showToast);
+  initQuickOptions(showToast, refreshOutputsState);
   void fetch("/api/v1/composites/compose1")
     .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
     .then((c) => {

@@ -150,6 +150,20 @@
         </div>
       </div>
 
+      <!-- Quick options: named snapshots of the outputs state, stored by pimatrix -->
+      <div class="bg-surface-container-low rounded-xl p-space-sm shadow-sm border border-outline-variant/30 flex flex-col gap-space-xs select-none" id="quick-section">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-primary text-[18px]">bolt</span>
+            <span class="font-label-md text-label-md text-on-surface font-bold tracking-tight">QUICK OPTIONS</span>
+          </div>
+          <button type="button" onclick="quickSaveOpen()" class="px-2.5 h-7 rounded-lg bg-primary text-on-primary font-label-sm text-[10px] font-bold uppercase flex items-center gap-1 active:scale-95">
+            <span class="material-symbols-outlined text-[14px]">add</span>Save as quick
+          </button>
+        </div>
+        <div class="grid grid-cols-3 gap-space-xs pt-1" id="quick-grid"></div>
+      </div>
+
       <!-- 3. BOTTOM SECTION: Network Stream Out (RTSP) Card -->
       <!-- Row 1: Full-width heading; Row 2: Start Stream and Settings buttons on the same row -->
       <div class="w-full bg-surface-container-low rounded-xl p-space-md shadow-sm border border-outline-variant/30 select-none flex flex-col gap-2.5" id="rtsp-card">
@@ -969,6 +983,22 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- QUICK OPTION DIALOG: name for a new quick option, or rename/delete -->
+  <dialog id="quick-modal" closedby="any" aria-labelledby="quick-modal-title" class="broadcast-dialog">
+    <div class="bg-surface-container-low rounded-2xl w-full p-3.5 shadow-xl border border-outline-variant/40 space-y-2.5 select-none">
+      <h4 class="font-headline-sm text-[15px] font-bold text-on-surface leading-none" id="quick-modal-title">Save as quick</h4>
+      <p class="font-label-sm text-[10px] text-on-surface-variant">Stores the current outputs: what is routed to Pi 1 and Pi 2, input effects and the composite input.</p>
+      <input id="quick-name-input" type="text" maxlength="40" placeholder="Name, e.g. Sermon" class="w-full h-9 px-2.5 rounded-lg bg-surface-container-high text-on-surface font-body-md text-sm border border-outline-variant/40" onkeydown="if(event.key==='Enter'){event.preventDefault();quickSubmit();}">
+      <p id="quick-error" class="hidden font-label-sm text-[10px] text-error"></p>
+      <div class="flex items-center gap-1.5">
+        <button type="button" id="quick-delete-btn" onclick="quickDelete()" class="hidden px-3 h-8 rounded-lg bg-error-container text-on-error-container font-label-sm text-[10px] font-bold uppercase active:scale-95">Delete</button>
+        <span class="flex-1"></span>
+        <button type="button" onclick="document.getElementById('quick-modal').close()" class="px-3 h-8 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-[10px] font-bold uppercase">Cancel</button>
+        <button type="button" onclick="quickSubmit()" class="px-3 h-8 rounded-lg bg-primary text-on-primary font-label-sm text-[10px] font-bold uppercase active:scale-95">Save</button>
       </div>
     </div>
   </dialog>
