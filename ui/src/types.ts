@@ -1,4 +1,4 @@
-export type FrontendTabId = "outputs" | "inputs" | "cameras" | "renderer";
+export type FrontendTabId = "outputs" | "inputs" | "cameras" | "renderer" | "voice";
 
 export type SourceId =
   | "hama"

@@ -3,6 +3,7 @@ import { initAtemView, setAtemActive } from "./atem";
 import { bindBackdropDismiss } from "./dialog-dismiss";
 import { initQuickOptions } from "./quick-options";
 import { initCompositeTab, setCompositeContext } from "./composite-tab";
+import { initVoiceTab, setVoiceTabActive } from "./voice-tab";
 
 // Global Fetch Interceptor for Authentication
 const originalFetch = window.fetch.bind(window);
@@ -242,7 +243,7 @@ function generatePresetThumbnailDataUrl(
 // ============================================================================
 function switchTab(tab: FrontendTabId, pushUrl = true): void {
   activeTab = tab;
-  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "renderer"];
+  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "renderer", "voice"];
   for (const t of tabs) {
     const panel = document.getElementById("tab-" + t);
     const nav = document.getElementById("nav-" + t);
@@ -286,16 +287,22 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (icon) icon.textContent = "layers";
     if (title) title.textContent = "PiPGM Renderer";
     if (subtitle) subtitle.textContent = "Stub Placeholder";
+  } else if (tab === "voice") {
+    if (icon) icon.textContent = "record_voice_over";
+    if (title) title.textContent = "Voice";
+    if (subtitle) subtitle.textContent = "pivoice capture, transcription and captions";
   }
 
   updateAtemPolling();
+  setVoiceTabActive(tab === "voice");
 
   if (pushUrl && window.history && window.history.replaceState) {
     const pathMap: Record<FrontendTabId, string> = {
       outputs: "/outputs",
       inputs: "/inputs",
       cameras: "/cameras",
-      renderer: "/pipgm"
+      renderer: "/pipgm",
+      voice: "/voice"
     };
     window.history.replaceState(null, "", pathMap[tab]);
   }
@@ -2114,6 +2121,7 @@ async function fetchInitialFromApiIfNeeded(): Promise<void> {
   if (p.startsWith("/inputs")) activeTab = "inputs";
   else if (p.startsWith("/cameras")) activeTab = "cameras";
   else if (p.startsWith("/pipgm") || p.startsWith("/renderer")) activeTab = "renderer";
+  else if (p.startsWith("/voice")) activeTab = "voice";
   else activeTab = "outputs";
 
   const [srcRes, outRes, fxRes, camRes, matRes, rtspRes] = await Promise.all([
@@ -2477,6 +2485,7 @@ async function bootstrap(): Promise<void> {
   initAtemView(showToast);
   initCompositeTab(showToast);
   initQuickOptions(showToast, refreshOutputsState);
+  initVoiceTab();
   void fetch("/api/v1/composites/compose1")
     .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
     .then((c) => {
