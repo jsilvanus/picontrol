@@ -8,6 +8,8 @@ interface QuickOption {
   createdAt: string;
 }
 
+import { bindBackdropDismiss } from "./dialog-dismiss";
+
 const PATH = "/api/v1/quick-options";
 const MAX_NAME = 40;
 
@@ -150,8 +152,6 @@ export function initQuickOptions(showToast: (message: string) => void, refresh: 
   window.quickApply = (id) => apply(id);
   window.quickSubmit = () => save();
   window.quickDelete = () => remove();
-  byId("quick-modal")?.addEventListener("click", (e) => {
-    if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close();
-  });
+  bindBackdropDismiss(byId<HTMLDialogElement>("quick-modal"));
   void load();
 }

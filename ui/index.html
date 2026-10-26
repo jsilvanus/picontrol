@@ -612,9 +612,9 @@
   </main>
 
   <!-- =================================================================== -->
-  <!-- AUXILIARY FEEDS MODAL (<dialog closedby="any"> per modern-web-guidance) -->
+  <!-- AUXILIARY FEEDS MODAL (<dialog closedby="closerequest"> per modern-web-guidance) -->
   <!-- =================================================================== -->
-  <dialog id="aux-modal-overlay" closedby="any" aria-labelledby="aux-dialog-title" class="broadcast-dialog">
+  <dialog id="aux-modal-overlay" closedby="closerequest" aria-labelledby="aux-dialog-title" class="broadcast-dialog">
     <div class="bg-surface-container-low rounded-2xl w-full p-4 shadow-xl border border-outline-variant/40 space-y-3">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">
@@ -658,10 +658,10 @@
   </dialog>
 
   <!-- =================================================================== -->
-  <!-- RTSP ASSIGNMENT, QUALITY & INFO MODAL (<dialog closedby="any">)      -->
+  <!-- RTSP ASSIGNMENT, QUALITY & INFO MODAL (<dialog closedby="closerequest">)      -->
   <!-- Opened via the button under the Network Stream Out heading          -->
   <!-- =================================================================== -->
-  <dialog id="rtsp-modal-overlay" closedby="any" aria-labelledby="rtsp-dialog-title" class="broadcast-dialog">
+  <dialog id="rtsp-modal-overlay" closedby="closerequest" aria-labelledby="rtsp-dialog-title" class="broadcast-dialog">
     <div class="bg-surface-container-low rounded-2xl w-full p-4 shadow-xl border border-outline-variant/40 space-y-3">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">
@@ -761,12 +761,12 @@
   </dialog>
 
   <!-- =================================================================== -->
-  <!-- CROP & EFFECTS MODAL (<dialog closedby="any">)                      -->
+  <!-- CROP & EFFECTS MODAL (<dialog closedby="closerequest">)                      -->
   <!-- Opened via long-press on output/input or tapping the crop badge.    -->
   <!-- Features a duplicated Cropped Area Live View ABOVE the interactive  -->
   <!-- draggable cropper so a mobile finger never obstructs the crop view. -->
   <!-- =================================================================== -->
-  <dialog id="crop-modal-overlay" closedby="any" aria-labelledby="crop-dialog-title" class="broadcast-dialog">
+  <dialog id="crop-modal-overlay" closedby="closerequest" aria-labelledby="crop-dialog-title" class="broadcast-dialog">
     <div class="bg-surface-container-low rounded-2xl w-full p-3.5 shadow-xl border border-outline-variant/40 space-y-2.5 select-none">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">
@@ -923,10 +923,15 @@
 
         <!-- 2. Interactive frame: drag the slide -->
         <div class="space-y-1">
-          <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant flex items-center gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant flex items-center gap-1">
             <span class="material-symbols-outlined text-[12px]">pan_tool_alt</span>
             Interactive Frame (Drag The Slide)
           </span>
+            <button type="button" id="comp-snap-btn" onclick="compToggleSnap()" class="px-2 h-6 rounded-md font-label-sm text-[9px] font-bold uppercase flex items-center gap-1 active:scale-95" title="Snap to edges, centre and halves">
+              <span class="material-symbols-outlined text-[13px]">grid_on</span><span id="comp-snap-label">Snap on</span>
+            </button>
+          </div>
           <div id="comp-frame" class="w-full aspect-video rounded-xl border border-outline-variant/40 relative overflow-hidden cursor-grab active:cursor-grabbing touch-none shadow-inner">
             <div id="comp-slide" class="absolute border-2 border-dashed border-primary bg-primary/25 pointer-events-none flex items-start justify-between p-1">
               <span id="comp-slide-tag" class="px-1.5 py-0.5 rounded bg-primary text-on-primary font-label-sm text-[9px] font-bold uppercase shadow-xs">SLIDE</span>
@@ -958,7 +963,7 @@
             <button type="button" onclick="compMove('left')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
               <span class="material-symbols-outlined text-[15px]">keyboard_arrow_left</span>
             </button>
-            <button type="button" onclick="compMove('center')" class="h-7 rounded bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[9px] font-bold flex items-center justify-center active:scale-95" title="Centre vertically">CTR</button>
+            <button type="button" onclick="compMove('center')" class="h-7 rounded bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface font-label-sm text-[9px] font-bold flex items-center justify-center active:scale-95" title="Centre the slide">CTR</button>
             <button type="button" onclick="compMove('right')" class="h-7 rounded bg-surface-container-high hover:bg-primary hover:text-on-primary text-on-surface flex items-center justify-center active:scale-95">
               <span class="material-symbols-outlined text-[15px]">keyboard_arrow_right</span>
             </button>
@@ -988,7 +993,7 @@
   </dialog>
 
   <!-- QUICK OPTION DIALOG: name for a new quick option, or rename/delete -->
-  <dialog id="quick-modal" closedby="any" aria-labelledby="quick-modal-title" class="broadcast-dialog">
+  <dialog id="quick-modal" closedby="closerequest" aria-labelledby="quick-modal-title" class="broadcast-dialog">
     <div class="bg-surface-container-low rounded-2xl w-full p-3.5 shadow-xl border border-outline-variant/40 space-y-2.5 select-none">
       <h4 class="font-headline-sm text-[15px] font-bold text-on-surface leading-none" id="quick-modal-title">Save as quick</h4>
       <p class="font-label-sm text-[10px] text-on-surface-variant">Stores the current outputs: what is routed to Pi 1 and Pi 2, input effects and the composite input.</p>
@@ -1004,7 +1009,7 @@
   </dialog>
 
   <!-- COMPOSITE SETTINGS DIALOG: opened from "More settings" in the Composite tab -->
-  <dialog id="comp-settings-modal" closedby="any" aria-labelledby="comp-settings-title" class="broadcast-dialog">
+  <dialog id="comp-settings-modal" closedby="closerequest" aria-labelledby="comp-settings-title" class="broadcast-dialog">
     <div class="bg-surface-container-low rounded-2xl w-full p-3.5 shadow-xl border border-outline-variant/40 space-y-2.5 select-none">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">
@@ -1087,7 +1092,7 @@
   <!-- =================================================================== -->
   <!-- CONTROL AUTHENTICATION MODAL (<dialog>)                             -->
   <!-- =================================================================== -->
-  <dialog id="auth-modal-overlay" class="broadcast-dialog" closedby="any" aria-labelledby="auth-dialog-title">
+  <dialog id="auth-modal-overlay" class="broadcast-dialog" closedby="closerequest" aria-labelledby="auth-dialog-title">
     <div class="bg-surface-container-low rounded-2xl w-full max-w-sm p-4 shadow-xl border border-outline-variant/40 space-y-3">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">
@@ -1133,7 +1138,7 @@
   <!-- =================================================================== -->
   <!-- MEDIAMTX INGEST CREDENTIALS MODAL (<dialog>)                        -->
   <!-- =================================================================== -->
-  <dialog id="mediamtx-modal-overlay" class="broadcast-dialog" closedby="any" aria-labelledby="mediamtx-dialog-title">
+  <dialog id="mediamtx-modal-overlay" class="broadcast-dialog" closedby="closerequest" aria-labelledby="mediamtx-dialog-title">
     <div class="bg-surface-container-low rounded-2xl w-full max-w-md p-4 shadow-xl border border-outline-variant/40 space-y-3">
       <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
         <div class="flex items-center gap-2">

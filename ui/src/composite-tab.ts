@@ -8,7 +8,10 @@ import type { Composite, CompositeId, CompositePatch } from "./composite/types";
 const SCALE_STEP = 0.05;
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 1;
-const OFFSET_STEP = 0.1;
+const FREE_STEP = 0.05;
+/** Positions the slide snaps to on each axis: the edges, the centre and the halves between. */
+const SNAP_POINTS = [-1, -0.5, 0, 0.5, 1];
+const SNAP_KEY = "picontrol.compositeSnap";
 const SLIDE_RATIO = { "10:16": 10 / 16, "9:16": 9 / 16 } as const;
 
 let toast: (message: string) => void = () => undefined;
@@ -19,9 +22,42 @@ let previewTimer: ReturnType<typeof setTimeout> | null = null;
 let loadSeq = 0;
 /** The source that was long-pressed to open the dialog (null = opened some other way). */
 let context: string | null = null;
+let snap = readSnap();
 const PIPGM_IDS: readonly string[] = ["PiPGM1", "PiPGM2", "PiPGM3"];
 
 const COMPOSITE_PATH = "/api/v1/composites";
+
+function readSnap(): boolean {
+  try {
+    return localStorage.getItem(SNAP_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** Round to the nearest snap point when snapping is on, else to 0.01. */
+function place(value: number): number {
+  const v = clamp(value, -1, 1);
+  if (!snap) return Math.round(v * 100) / 100;
+  return SNAP_POINTS.reduce((best, p) => (Math.abs(p - v) < Math.abs(best - v) ? p : best), SNAP_POINTS[0]);
+}
+
+/** Arrow step: the next snap point in that direction, or a small nudge when snap is off. */
+function stepped(value: number, dir: 1 | -1): number {
+  if (!snap) return clamp(Math.round((value + dir * FREE_STEP) * 100) / 100, -1, 1);
+  const eps = 1e-6;
+  const next = dir > 0 ? SNAP_POINTS.find((p) => p > value + eps) : [...SNAP_POINTS].reverse().find((p) => p < value - eps);
+  return next ?? clamp(value, -1, 1);
+}
+
+function renderSnap(): void {
+  const btn = byId("comp-snap-btn");
+  const label = byId("comp-snap-label");
+  if (label) label.textContent = snap ? "Snap on" : "Snap off";
+  if (btn) {
+    btn.className = `px-2 h-6 rounded-md font-label-sm text-[9px] font-bold uppercase flex items-center gap-1 active:scale-95 ${snap ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`;
+  }
+}
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T | null {
   return document.getElementById(id) as T | null;
@@ -60,12 +96,12 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** The slide rectangle as fractions of the frame, same rule as pimatrix' key page. */
-export function slideRect(c: Pick<Composite, "width" | "height" | "side" | "slideAspect" | "slideScale" | "offsetY">): { x: number; y: number; w: number; h: number } {
+export function slideRect(c: Pick<Composite, "width" | "height" | "side" | "slideAspect" | "slideScale" | "offsetX" | "offsetY">): { x: number; y: number; w: number; h: number } {
   const h = clamp(c.slideScale, MIN_SCALE, MAX_SCALE);
   const w = Math.min(1, h * SLIDE_RATIO[c.slideAspect] * (c.height / c.width));
   const free = 1 - h;
   return {
-    x: c.side === "left" ? 0 : 1 - w,
+    x: ((1 - w) / 2) * (1 + (c.offsetX ?? (c.side === "left" ? -1 : 1))),
     y: (free / 2) * (1 + (c.offsetY ?? 0)),
     w,
     h
@@ -99,6 +135,7 @@ function render(): void {
     return;
   }
   renderInput();
+  renderSnap();
   if (status) {
     const parts: string[] = [comp.enabled ? comp.state : "stopped"];
     if (!comp.hasSlide) parts.push("no slide yet");
@@ -106,7 +143,7 @@ function render(): void {
     status.textContent = parts.join(" • ");
   }
   if (readout) {
-    readout.textContent = `${comp.side} • ${comp.slideAspect} • ${Math.round(comp.slideScale * 100)}% • Y ${Math.round((comp.offsetY ?? 0) * 100)}%`;
+    readout.textContent = `${comp.slideAspect} • ${Math.round(comp.slideScale * 100)}% • X ${Math.round((comp.offsetX ?? 0) * 100)}% • Y ${Math.round((comp.offsetY ?? 0) * 100)}%`;
   }
   if (run) {
     run.textContent = comp.enabled ? "Stop" : "Start";
@@ -132,8 +169,8 @@ function render(): void {
   }
   if (tag) tag.textContent = comp.slideAspect;
   for (const [id, active] of [
-    ["comp-preset-left", comp.side === "left"],
-    ["comp-preset-right", comp.side === "right"],
+    ["comp-preset-left", (comp.offsetX ?? -1) === -1],
+    ["comp-preset-right", (comp.offsetX ?? -1) === 1],
     ["comp-preset-10-16", comp.slideAspect === "10:16"],
     ["comp-preset-9-16", comp.slideAspect === "9:16"]
   ] as const) {
@@ -256,38 +293,42 @@ function bindDrag(): void {
   const frame = byId("comp-frame");
   if (!frame) return;
   let dragging = false;
+  let startX = 0;
   let startY = 0;
-  let startOffset = 0;
+  let startOffsetX = 0;
+  let startOffsetY = 0;
 
   frame.addEventListener("pointerdown", (e) => {
     if (!comp) return;
     dragging = true;
+    startX = e.clientX;
     startY = e.clientY;
-    startOffset = comp.offsetY ?? 0;
+    startOffsetX = comp.offsetX ?? (comp.side === "left" ? -1 : 1);
+    startOffsetY = comp.offsetY ?? 0;
     try {
       frame.setPointerCapture(e.pointerId);
     } catch {
       // synthetic events have no active pointer
     }
-    move(e);
   });
   const move = (e: PointerEvent): void => {
     if (!dragging || !comp) return;
     const rect = frame.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    comp.side = (e.clientX - rect.left) / rect.width < 0.5 ? "left" : "right";
-    const free = 1 - clamp(comp.slideScale, MIN_SCALE, MAX_SCALE);
-    if (free > 0) {
-      const dy = (e.clientY - startY) / (rect.height * (free / 2));
-      comp.offsetY = Math.round(clamp(startOffset + dy, -1, 1) * 100) / 100;
-    }
+    const r = slideRect(comp);
+    // The slide follows the finger: a drag across the free space moves it from edge to edge.
+    const freeX = 1 - r.w;
+    const freeY = 1 - r.h;
+    if (freeX > 0) comp.offsetX = place(startOffsetX + (e.clientX - startX) / (rect.width * (freeX / 2)));
+    if (freeY > 0) comp.offsetY = place(startOffsetY + (e.clientY - startY) / (rect.height * (freeY / 2)));
+    comp.side = (comp.offsetX ?? -1) < 0 ? "left" : "right";
     render();
   };
   frame.addEventListener("pointermove", move);
   const end = (): void => {
     if (!dragging || !comp) return;
     dragging = false;
-    void patch({ side: comp.side, offsetY: comp.offsetY ?? 0 });
+    void patch({ offsetX: comp.offsetX, offsetY: comp.offsetY ?? 0 });
   };
   frame.addEventListener("pointerup", end);
   frame.addEventListener("pointercancel", end);
@@ -339,18 +380,28 @@ export function initCompositeTab(showToast: (message: string) => void): void {
 
   window.compPreset = async (preset) => {
     if (preset === "left" || preset === "right") await patch({ side: preset });
-    else if (preset === "reset") await patch({ side: "left", slideAspect: "10:16", slideScale: 1, offsetY: 0 });
+    else if (preset === "reset") await patch({ offsetX: -1, slideAspect: "10:16", slideScale: 1, offsetY: 0 });
     else await patch({ slideAspect: preset });
   };
 
   window.compMove = async (direction) => {
     if (!comp) return;
-    if (direction === "left" || direction === "right") await patch({ side: direction });
-    else if (direction === "center") await patch({ offsetY: 0 });
-    else {
-      const next = clamp((comp.offsetY ?? 0) + (direction === "up" ? -OFFSET_STEP : OFFSET_STEP), -1, 1);
-      await patch({ offsetY: Math.round(next * 100) / 100 });
+    const x = comp.offsetX ?? (comp.side === "left" ? -1 : 1);
+    const y = comp.offsetY ?? 0;
+    if (direction === "center") await patch({ offsetX: 0, offsetY: 0 });
+    else if (direction === "left") await patch({ offsetX: stepped(x, -1) });
+    else if (direction === "right") await patch({ offsetX: stepped(x, 1) });
+    else await patch({ offsetY: stepped(y, direction === "up" ? -1 : 1) });
+  };
+
+  window.compToggleSnap = () => {
+    snap = !snap;
+    try {
+      localStorage.setItem(SNAP_KEY, snap ? "on" : "off");
+    } catch {
+      // the choice just is not remembered
     }
+    renderSnap();
   };
 
   window.openCompositeSettings = () => {
