@@ -8,8 +8,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
-        multiview: fileURLToPath(new URL("./multiview.html", import.meta.url)),
-        composite: fileURLToPath(new URL("./composite.html", import.meta.url))
+        multiview: fileURLToPath(new URL("./multiview.html", import.meta.url))
       }
     }
   },
