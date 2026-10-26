@@ -891,9 +891,22 @@
           <label for="comp-input-select" class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant flex-shrink-0">Input</label>
           <select id="comp-input-select" class="flex-1 h-8 px-2 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-[11px] border border-outline-variant/40" onchange="compSelectInput(this.value)">
             <option value="upload">Uploaded slide</option>
-            <option value="PiPGM1">PiPGM 1</option>
-            <option value="PiPGM2">PiPGM 2</option>
-            <option value="PiPGM3">PiPGM 3</option>
+            <optgroup label="Live source">
+              <option value="src:hama">HAMA</option>
+              <option value="src:rtmp1">RTMP1</option>
+              <option value="src:rtmp2">RTMP2</option>
+              <option value="src:cam1">Camera 1</option>
+              <option value="src:cam2">Camera 2</option>
+              <option value="src:cam3">Camera 3</option>
+              <option value="src:PiPGM1">PiPGM 1 (video)</option>
+              <option value="src:PiPGM2">PiPGM 2 (video)</option>
+              <option value="src:PiPGM3">PiPGM 3 (video)</option>
+            </optgroup>
+            <optgroup label="piprogram slides">
+              <option value="pip:PiPGM1">PiPGM 1 slides</option>
+              <option value="pip:PiPGM2">PiPGM 2 slides</option>
+              <option value="pip:PiPGM3">PiPGM 3 slides</option>
+            </optgroup>
           </select>
         </div>
         <!-- Target composite and run state -->
@@ -1028,8 +1041,9 @@
       <div class="grid grid-cols-2 gap-2">
         <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Width<input id="cs-width" type="number" min="16" max="3840" step="2" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"></label>
         <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Height<input id="cs-height" type="number" min="16" max="3840" step="2" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"></label>
-        <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Slide source<select id="cs-source" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"><option value="upload">Sent PNG (test slide)</option><option value="piprogram">piprogram pipeline</option></select></label>
+        <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Slide source<select id="cs-source" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"><option value="upload">Sent PNG (test slide)</option><option value="piprogram">piprogram pipeline</option><option value="source">Live source</option></select></label>
         <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Pipeline<select id="cs-pipeline" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"><option value="PiPGM1">PiPGM1</option><option value="PiPGM2">PiPGM2</option><option value="PiPGM3">PiPGM3</option></select></label>
+        <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Live source<select id="cs-live-source" class="w-full h-8 px-2 bg-surface-container rounded-lg border border-outline-variant/50 text-on-surface font-label-sm text-[11px] focus:outline-none focus:border-primary"><option value="hama">HAMA</option><option value="rtmp1">RTMP1</option><option value="rtmp2">RTMP2</option><option value="cam1">Camera 1</option><option value="cam2">Camera 2</option><option value="cam3">Camera 3</option><option value="PiPGM1">PiPGM1</option><option value="PiPGM2">PiPGM2</option><option value="PiPGM3">PiPGM3</option></select></label>
       </div>
       <div class="grid grid-cols-2 gap-2" id="cs-key-fields">
         <label class="flex flex-col gap-0.5 font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant">Key colour<input id="cs-key-color" type="color" class="w-full h-8 rounded-lg border border-outline-variant/50 bg-surface-container"></label>
