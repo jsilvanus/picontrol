@@ -866,7 +866,22 @@
       </div>
       </div>
 
-      <div id="crop-pane-composite" class="hidden space-y-2.5">
+      <div id="crop-pane-composite" class="hidden space-y-2.5 relative">
+        <!-- Shown over the pane (blurred) when the long-pressed source is not the composite's input -->
+        <div id="comp-move-overlay" class="hidden absolute inset-0 z-10 rounded-xl backdrop-blur-md bg-surface/50 flex flex-col items-center justify-center gap-2 p-4 text-center">
+          <span id="comp-move-text" class="font-label-sm text-[11px] text-on-surface font-bold uppercase"></span>
+          <button type="button" id="comp-move-btn" onclick="compMoveHere()" class="px-4 h-9 rounded-lg bg-primary text-on-primary font-label-sm text-[11px] font-bold uppercase active:scale-95">Move composite to this source</button>
+        </div>
+        <!-- Input of the composite: where its slide comes from -->
+        <div class="flex items-center gap-1.5">
+          <label for="comp-input-select" class="font-label-sm text-[9px] uppercase tracking-wider font-bold text-on-surface-variant flex-shrink-0">Input</label>
+          <select id="comp-input-select" class="flex-1 h-8 px-2 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-[11px] border border-outline-variant/40" onchange="compSelectInput(this.value)">
+            <option value="upload">Uploaded slide</option>
+            <option value="PiPGM1">PiPGM 1</option>
+            <option value="PiPGM2">PiPGM 2</option>
+            <option value="PiPGM3">PiPGM 3</option>
+          </select>
+        </div>
         <!-- Target composite and run state -->
         <div class="flex items-center gap-1.5">
           <div class="flex flex-1 bg-surface-container-highest rounded-lg p-0.5">
