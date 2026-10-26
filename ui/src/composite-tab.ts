@@ -69,6 +69,13 @@ export function slideRect(c: Pick<Composite, "width" | "height" | "side" | "slid
   };
 }
 
+function csError(message: string | null): void {
+  const el = byId("cs-error");
+  if (!el) return;
+  el.textContent = message ?? "";
+  el.classList.toggle("hidden", message === null);
+}
+
 function render(): void {
   for (const id of ["compose1", "compose2"] as const) {
     const btn = byId(`comp-target-${id}`);
@@ -301,6 +308,96 @@ export function initCompositeTab(showToast: (message: string) => void): void {
     else {
       const next = clamp((comp.offsetY ?? 0) + (direction === "up" ? -OFFSET_STEP : OFFSET_STEP), -1, 1);
       await patch({ offsetY: Math.round(next * 100) / 100 });
+    }
+  };
+
+  window.openCompositeSettings = () => {
+    if (!comp) return;
+    const set = (id: string, value: string): void => {
+      const el = byId<HTMLInputElement>(id);
+      if (el) el.value = value;
+    };
+    set("cs-width", String(comp.width));
+    set("cs-height", String(comp.height));
+    set("cs-source", comp.slideSource);
+    set("cs-pipeline", comp.pipelineId);
+    set("cs-key-color", comp.keyColor);
+    set("cs-key-mode", comp.keyMode);
+    set("cs-media-slot", String(comp.atem.mediaSlot));
+    set("cs-media-player", String(comp.atem.mediaPlayer));
+    set("cs-dsk", String(comp.atem.dskIndex));
+    const auto = byId<HTMLInputElement>("cs-auto-on-air");
+    if (auto) auto.checked = comp.atem.autoOnAir;
+    byId("cs-key-fields")?.classList.toggle("hidden", comp.kind !== "hdmi-key");
+    byId("cs-atem-fields")?.classList.toggle("hidden", comp.kind !== "atem-media");
+    const sub = byId("comp-settings-sub");
+    if (sub) sub.textContent = comp.id;
+    csError(null);
+    const dialog = byId<HTMLDialogElement>("comp-settings-modal");
+    if (dialog && !dialog.open) dialog.showModal();
+  };
+
+  window.closeCompositeSettings = () => {
+    const dialog = byId<HTMLDialogElement>("comp-settings-modal");
+    if (dialog?.open) dialog.close();
+  };
+
+  window.compSaveSettings = async () => {
+    if (!comp) return;
+    const num = (id: string): number => Number(byId<HTMLInputElement>(id)?.value);
+    const patchBody: CompositePatch = {
+      width: num("cs-width"),
+      height: num("cs-height"),
+      slideSource: (byId<HTMLSelectElement>("cs-source")?.value ?? comp.slideSource) as Composite["slideSource"],
+      pipelineId: (byId<HTMLSelectElement>("cs-pipeline")?.value ?? comp.pipelineId) as Composite["pipelineId"]
+    };
+    if (comp.kind === "hdmi-key") {
+      patchBody.keyColor = byId<HTMLInputElement>("cs-key-color")?.value ?? comp.keyColor;
+      patchBody.keyMode = (byId<HTMLSelectElement>("cs-key-mode")?.value ?? comp.keyMode) as Composite["keyMode"];
+    } else {
+      patchBody.atem = {
+        mediaSlot: num("cs-media-slot"),
+        mediaPlayer: num("cs-media-player"),
+        dskIndex: num("cs-dsk"),
+        autoOnAir: byId<HTMLInputElement>("cs-auto-on-air")?.checked ?? false
+      };
+    }
+    try {
+      const res = await fetch(`${COMPOSITE_PATH}/${comp.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody)
+      });
+      if (!res.ok) {
+        csError(await errorMessage(res));
+        return;
+      }
+      comp = (await res.json()) as Composite;
+      render();
+      schedulePreview();
+      window.closeCompositeSettings();
+    } catch {
+      csError("Request failed");
+    }
+  };
+
+  window.compSendSlide = async () => {
+    const file = byId<HTMLInputElement>("cs-slide-file")?.files?.[0];
+    if (!file) {
+      csError("Choose a PNG file first");
+      return;
+    }
+    try {
+      const res = await fetch(`${COMPOSITE_PATH}/slide`, { method: "PUT", headers: { "Content-Type": "image/png" }, body: file });
+      if (!res.ok) {
+        csError(await errorMessage(res));
+        return;
+      }
+      csError(null);
+      toast("Test slide sent");
+      await load();
+    } catch {
+      csError("Request failed");
     }
   };
 

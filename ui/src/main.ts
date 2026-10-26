@@ -1506,7 +1506,8 @@ function renderCamerasTab(): void {
       if (cam1PresetsSection) cam1PresetsSection.classList.remove("hidden");
       if (cam2PresetsSection) cam2PresetsSection.classList.remove("hidden");
     } else if (camFocusMode === "cam1") {
-      monitorsContainer.className = "grid grid-cols-1 gap-space-sm w-full transition-all duration-300";
+      // Single view keeps the camera preview where it was; the parameter matrix takes the other slot.
+      monitorsContainer.className = "grid grid-cols-2 gap-space-sm w-full items-start transition-all duration-300";
       card1.classList.remove("hidden");
       card2.classList.add("hidden");
       if (expandedConfigPanel) {
@@ -1516,7 +1517,7 @@ function renderCamerasTab(): void {
       if (cam1PresetsSection) cam1PresetsSection.classList.remove("hidden");
       if (cam2PresetsSection) cam2PresetsSection.classList.add("hidden");
     } else {
-      monitorsContainer.className = "grid grid-cols-1 gap-space-sm w-full transition-all duration-300";
+      monitorsContainer.className = "grid grid-cols-2 gap-space-sm w-full items-start transition-all duration-300";
       card1.classList.add("hidden");
       card2.classList.remove("hidden");
       if (expandedConfigPanel) {
@@ -1527,6 +1528,16 @@ function renderCamerasTab(): void {
       if (cam2PresetsSection) cam2PresetsSection.classList.remove("hidden");
     }
   }
+
+  // Slot of the parameter matrix: the column of the camera that is not in focus.
+  if (expandedConfigPanel) {
+    expandedConfigPanel.style.gridColumn = camFocusMode === "cam1" ? "2" : "1";
+    expandedConfigPanel.style.gridRow = "1";
+  }
+  if (card1) card1.style.gridColumn = "1";
+  if (card2) card2.style.gridColumn = "2";
+  if (card1) card1.style.gridRow = "1";
+  if (card2) card2.style.gridRow = "1";
 
   // ATEM view belongs to double view, PTZ movement and focus to single view.
   const isDual = camFocusMode === "dual";

@@ -177,6 +177,10 @@ declare global {
     compToggleRun: () => Promise<void>;
     compPreset: (preset: "left" | "right" | "10:16" | "9:16" | "reset") => Promise<void>;
     compMove: (direction: "left" | "right" | "up" | "down" | "center") => Promise<void>;
+    openCompositeSettings: () => void;
+    closeCompositeSettings: () => void;
+    compSaveSettings: () => Promise<void>;
+    compSendSlide: () => Promise<void>;
     compResize: (action: "in" | "out") => Promise<void>;
     adjustPtzSpeed: (delta: number) => void;
   }
