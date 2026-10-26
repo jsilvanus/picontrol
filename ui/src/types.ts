@@ -176,6 +176,11 @@ declare global {
     setCropDialogTab: (tab: "crop" | "composite") => void;
     compSelectInput: (value: string) => Promise<void>;
     compMoveHere: () => Promise<void>;
+    quickSaveOpen: () => void;
+    quickEdit: (id: string) => void;
+    quickApply: (id: string) => Promise<void>;
+    quickSubmit: () => Promise<void>;
+    quickDelete: () => Promise<void>;
     compSelectTarget: (id: "compose1" | "compose2") => Promise<void>;
     compToggleRun: () => Promise<void>;
     compPreset: (preset: "left" | "right" | "10:16" | "9:16" | "reset") => Promise<void>;
