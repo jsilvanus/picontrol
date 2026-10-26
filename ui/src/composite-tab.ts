@@ -232,21 +232,27 @@ function showPreviewEmpty(text: string): void {
   }
 }
 
+const LIVE_PREVIEW_MS = 3000;
+
 async function refreshPreview(): Promise<void> {
   if (!comp) return;
   const seq = loadSeq;
-  if (comp.slideSource === "source") {
-    showPreviewEmpty("Live source: no still preview. Route compose 1 to an output to see it.");
-    return;
+  const live = comp.slideSource === "source";
+  // A live source has no still: ask for a fresh frame every few seconds while the tab is open.
+  if (live) {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      if (seq === loadSeq) void refreshPreview();
+    }, LIVE_PREVIEW_MS);
   }
-  if (!comp.hasSlide) {
+  if (!live && !comp.hasSlide) {
     showPreviewEmpty("No preview yet. Send a slide first.");
     return;
   }
   try {
     const res = await fetch(`${COMPOSITE_PATH}/${comp.id}/preview.png`);
     if (!res.ok) {
-      showPreviewEmpty(`Preview unavailable (${res.status})`);
+      showPreviewEmpty(live ? "No picture from this source right now." : `Preview unavailable (${res.status})`);
       return;
     }
     const blob = await res.blob();
