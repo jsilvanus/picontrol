@@ -3,7 +3,7 @@
 // on the key page. It is the same layout as the Crop tab: preview on top, a draggable
 // frame below, presets and nudge buttons under that.
 
-import type { Composite, CompositeId, CompositePatch } from "./composite/types";
+import { LIVE_SOURCE_IDS, type Composite, type CompositeId, type CompositePatch, type LiveSourceId } from "./composite/types";
 
 const SCALE_STEP = 0.05;
 const MIN_SCALE = 0.6;
@@ -23,7 +23,6 @@ let loadSeq = 0;
 /** The source that was long-pressed to open the dialog (null = opened some other way). */
 let context: string | null = null;
 let snap = readSnap();
-const PIPGM_IDS: readonly string[] = ["PiPGM1", "PiPGM2", "PiPGM3"];
 
 const COMPOSITE_PATH = "/api/v1/composites";
 
@@ -180,28 +179,39 @@ function render(): void {
   }
 }
 
-/** The value of the Input dropdown for a composite: "upload" or the followed pipeline. */
+/** The value of the Input dropdown: "upload", "src:<source>" (live video) or "pip:<pipeline>" (piprogram slides). */
 function inputOf(c: Composite): string {
-  return c.slideSource === "piprogram" ? c.pipelineId : "upload";
+  if (c.slideSource === "source") return `src:${c.sourceId}`;
+  if (c.slideSource === "piprogram") return `pip:${c.pipelineId}`;
+  return "upload";
+}
+
+function inputLabel(value: string): string {
+  if (value === "upload") return "an uploaded slide";
+  if (value.startsWith("pip:")) return `piprogram slides (${value.slice(4)})`;
+  return `live ${value.slice(4)}`;
 }
 
 /** Input dropdown, and the blurred "move composite here" cover for another source. */
 function renderInput(): void {
   const select = byId<HTMLSelectElement>("comp-input-select");
-  if (select && comp) select.value = inputOf(comp);
+  if (select && comp) {
+    select.value = inputOf(comp);
+    // The ATEM media composite is a still: it cannot show live video.
+    for (const option of Array.from(select.options)) option.disabled = comp.kind === "atem-media" && option.value.startsWith("src:");
+  }
   const overlay = byId("comp-move-overlay");
   if (!overlay) return;
-  const other = comp !== null && context !== null && context !== "compose1" && context !== "compose2" && inputOf(comp) !== context;
+  const live = context !== null && (LIVE_SOURCE_IDS as readonly string[]).includes(context);
+  const other = comp !== null && live && inputOf(comp) !== `src:${context}`;
   overlay.classList.toggle("hidden", !other);
   overlay.classList.toggle("flex", other);
   const text = byId("comp-move-text");
   const btn = byId<HTMLButtonElement>("comp-move-btn");
   if (!other || !comp) return;
-  const movable = context !== null && PIPGM_IDS.includes(context);
+  const movable = comp.kind === "hdmi-key";
   if (text) {
-    text.textContent = movable
-      ? `Composite input is ${inputOf(comp) === "upload" ? "an uploaded slide" : inputOf(comp)}`
-      : "Only piprogram sources can feed the composite";
+    text.textContent = movable ? `Composite input is ${inputLabel(inputOf(comp))}` : "The ATEM media composite cannot show live video";
   }
   if (btn) btn.classList.toggle("hidden", !movable);
 }
@@ -225,6 +235,10 @@ function showPreviewEmpty(text: string): void {
 async function refreshPreview(): Promise<void> {
   if (!comp) return;
   const seq = loadSeq;
+  if (comp.slideSource === "source") {
+    showPreviewEmpty("Live source: no still preview. Route compose 1 to an output to see it.");
+    return;
+  }
   if (!comp.hasSlide) {
     showPreviewEmpty("No preview yet. Send a slide first.");
     return;
@@ -336,10 +350,12 @@ function bindDrag(): void {
 
 export function initCompositeTab(showToast: (message: string) => void): void {
   window.compSelectInput = async (value) => {
-    await patch(value === "upload" ? { slideSource: "upload" } : { slideSource: "piprogram", pipelineId: value as Composite["pipelineId"] });
+    if (value === "upload") await patch({ slideSource: "upload" });
+    else if (value.startsWith("pip:")) await patch({ slideSource: "piprogram", pipelineId: value.slice(4) as Composite["pipelineId"] });
+    else await patch({ slideSource: "source", sourceId: value.slice(4) as LiveSourceId });
   };
   window.compMoveHere = async () => {
-    if (context && PIPGM_IDS.includes(context)) await window.compSelectInput(context);
+    if (context && (LIVE_SOURCE_IDS as readonly string[]).includes(context)) await window.compSelectInput(`src:${context}`);
   };
   toast = showToast;
   bindDrag();
@@ -414,6 +430,7 @@ export function initCompositeTab(showToast: (message: string) => void): void {
     set("cs-height", String(comp.height));
     set("cs-source", comp.slideSource);
     set("cs-pipeline", comp.pipelineId);
+    set("cs-live-source", comp.sourceId);
     set("cs-key-color", comp.keyColor);
     set("cs-key-mode", comp.keyMode);
     set("cs-media-slot", String(comp.atem.mediaSlot));
@@ -442,7 +459,8 @@ export function initCompositeTab(showToast: (message: string) => void): void {
       width: num("cs-width"),
       height: num("cs-height"),
       slideSource: (byId<HTMLSelectElement>("cs-source")?.value ?? comp.slideSource) as Composite["slideSource"],
-      pipelineId: (byId<HTMLSelectElement>("cs-pipeline")?.value ?? comp.pipelineId) as Composite["pipelineId"]
+      pipelineId: (byId<HTMLSelectElement>("cs-pipeline")?.value ?? comp.pipelineId) as Composite["pipelineId"],
+      sourceId: (byId<HTMLSelectElement>("cs-live-source")?.value ?? comp.sourceId) as LiveSourceId
     };
     if (comp.kind === "hdmi-key") {
       patchBody.keyColor = byId<HTMLInputElement>("cs-key-color")?.value ?? comp.keyColor;
