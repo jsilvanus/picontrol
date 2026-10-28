@@ -72,3 +72,20 @@ A dedicated preview card showing the actual YouTube viewer stream (with ~30-seco
 * `POST /api/v1/youtube/broadcasts/start`: Transition current broadcast to testing/live.
 * `POST /api/v1/youtube/broadcasts/stop`: Transition current broadcast to complete.
 * `GET /api/v1/youtube/broadcasts/current`: Returns `{ broadcastId, embedUrl, state, health, captions }`.
+
+---
+
+## 4. Tally & Camera Director Cueing (pilight)
+
+> For full specification and component details, see [docs/pilight-integration.md](docs/pilight-integration.md).
+
+### Planned UI Additions:
+1. **Camera PTZ Page Director Cues**:
+   - Quick action bar: `[ ◄ Pan Left ]`, `[ Pan Right ► ]`, `[ 🔍+ Zoom In ]`, `[ 🔍- Zoom Out ]`, and `[ 🔔 Cue Operator ]` (flashes rear LEDs 1 & 9).
+2. **Tally Monitor Strip**:
+   - Compact badges for each light (`tally01`..`tally08`) showing real-time state: Program (Red), Preview (Green), Off, or mini 9-zone segment bar.
+   - Quick buttons: `[ CALL ]` (flash 3x), `[ HOLD ]` (toggle server data ignore), `[ Brightness ]`.
+3. **Tally Configuration & Mapping Modal**:
+   - ATEM input assignment dropdown (decouples Tally unit number from ATEM input).
+   - Free 9-LED segment editor for multi-status monitor lights (YouTube stream, ATEM recording, projector power, Atlona routes).
+   - `[ Cycle Test 9 LEDs ]` diagnostic button to verify physical LED ordering.
