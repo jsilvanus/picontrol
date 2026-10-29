@@ -7,6 +7,7 @@ import { initVoiceTab, setVoiceTabActive } from "./voice-tab";
 import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopBroadcast } from "./youtube-tab";
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
+import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
 
 // Global Fetch Interceptor for Authentication
 const originalFetch = window.fetch.bind(window);
@@ -247,7 +248,7 @@ function generatePresetThumbnailDataUrl(
 // ============================================================================
 function switchTab(tab: FrontendTabId, pushUrl = true): void {
   activeTab = tab;
-  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer"];
+  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "sound"];
   for (const t of tabs) {
     const panel = document.getElementById("tab-" + t);
     const nav = document.getElementById("nav-" + t);
@@ -267,7 +268,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
 
   const moreBtn = document.getElementById("nav-more");
   const moreLabel = document.getElementById("nav-more-label");
-  const isOverflowTab = tab === "radio" || tab === "inputs" || tab === "renderer";
+  const isOverflowTab = tab === "radio" || tab === "inputs" || tab === "renderer" || tab === "sound";
   if (moreBtn) {
     if (isOverflowTab) {
       moreBtn.className = "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg bg-primary text-on-primary shadow-sm transition-all active:scale-95";
@@ -322,6 +323,10 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (icon) icon.textContent = "layers";
     if (title) title.textContent = "PiPGM Renderer";
     if (subtitle) subtitle.textContent = "Stub Placeholder";
+  } else if (tab === "sound") {
+    if (icon) icon.textContent = "tune";
+    if (title) title.textContent = "Äänimikseri";
+    if (subtitle) subtitle.textContent = "Sali & Striimi Mikseri (London BLU-100)";
   }
 
   updateAtemPolling();
@@ -329,6 +334,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   setTallyTabActive(tab === "tally");
   setVoiceTabActive(tab === "voice");
   setRadioTabActive(tab === "radio");
+  setSoundTabActive(tab === "sound");
 
   if (pushUrl && window.history && window.history.replaceState) {
     const pathMap: Record<FrontendTabId, string> = {
@@ -339,7 +345,8 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
       tally: "/tally",
       voice: "/voice",
       radio: "/radio",
-      renderer: "/pipgm"
+      renderer: "/pipgm",
+      sound: "/sound"
     };
     window.history.replaceState(null, "", pathMap[tab]);
   }
@@ -2287,6 +2294,15 @@ function connectSse(): void {
     }
   });
 
+  sse.addEventListener("pisound", (e) => {
+    try {
+      const payload = JSON.parse((e as MessageEvent).data);
+      handlePisoundTelemetry(payload);
+    } catch {
+      // ignore
+    }
+  });
+
   sse.addEventListener("camera", (e) => {
     try {
       const payload = JSON.parse((e as MessageEvent).data) as {
@@ -2554,6 +2570,8 @@ async function bootstrap(): Promise<void> {
   if (tallyRoot) initTallyTab(tallyRoot);
   const radioRoot = document.getElementById("radio-root");
   if (radioRoot) initRadioTab(radioRoot);
+  const soundRoot = document.getElementById("sound-root");
+  if (soundRoot) initSoundTab(soundRoot, showToast);
   void fetch("/api/v1/composites/compose1")
     .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
     .then((c) => {
