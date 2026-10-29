@@ -358,8 +358,12 @@ function render(): void {
           </button>
         </div>
 
-        <!-- CHANNEL VISIBILITY CONFIG BUTTON -->
+        <!-- CHANNEL VISIBILITY CONFIG BUTTON & RESET BUTTON -->
         <div class="flex items-center gap-1.5">
+          <button type="button" id="sound-reset-btn" class="px-2.5 py-1.5 rounded-lg bg-surface-container-high hover:bg-amber-500/15 hover:text-amber-700 dark:hover:text-amber-400 text-on-surface border border-outline-variant/40 font-label-sm text-[11px] font-bold uppercase flex items-center gap-1.5 transition-all active:scale-95" title="Palauta kirkon oletusasetukset">
+            <span class="material-symbols-outlined text-[16px] text-amber-500">restart_alt</span>
+            <span>Palauta oletukset</span>
+          </button>
           <button type="button" id="sound-config-channels-btn" class="px-2.5 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/40 font-label-sm text-[11px] font-bold uppercase flex items-center gap-1.5 transition-all active:scale-95">
             <span class="material-symbols-outlined text-[16px] text-primary">view_column</span>
             <span>Kanavat (${visibleChannelIds.size}/${ALL_CHANNELS.length})</span>
@@ -433,6 +437,40 @@ function render(): void {
         </div>
       </div>
     </dialog>
+
+    <!-- 5. RESET CONFIRMATION MODAL -->
+    <dialog id="sound-reset-modal" class="broadcast-dialog" closedby="closerequest" aria-labelledby="sound-reset-modal-title">
+      <div class="bg-surface-container-low rounded-2xl w-full max-w-md p-5 shadow-xl border border-outline-variant/40 space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[24px]">restart_alt</span>
+          </div>
+          <div>
+            <h4 class="font-headline-sm text-[16px] font-bold text-on-surface" id="sound-reset-modal-title">Palautetaanko oletukset?</h4>
+            <span class="font-label-sm text-[11px] text-on-surface-variant">BSS BLU-100 & pisound -oletustilat</span>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-surface-container border border-outline-variant/20 text-[12px] text-on-surface-variant space-y-2 leading-relaxed">
+          <p>Tämä toiminto palauttaa kaikki 26 mikrofoni- ja instrumenttikanavaa sekä master-lähdöt kirkon kalibroituihin oletusarvoihin:</p>
+          <ul class="list-disc list-inside space-y-0.5 text-[11px] text-on-surface">
+            <li>Kutsuu <strong>BLU-100 Preset 2</strong>:n (langattomien mikien turvallinen -10 dB referenssitaso).</li>
+            <li>Palauttaa Sali-, Striimi- ja Nettiradio-masterit oletuksiin.</li>
+            <li>Asettaa puhemikit (Saarna, Alttari, Kapulat) oletustiloihin.</li>
+          </ul>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" id="sound-reset-cancel-btn" class="px-4 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-[11px] font-bold uppercase transition-all">
+            Peruuta
+          </button>
+          <button type="button" id="sound-reset-confirm-btn" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold uppercase shadow-sm transition-all flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            <span>Kyllä, palauta oletukset</span>
+          </button>
+        </div>
+      </div>
+    </dialog>
   `;
 
   bindTopEvents();
@@ -444,20 +482,48 @@ function bindTopEvents(): void {
   document.getElementById("sound-mix-sali-btn")?.addEventListener("click", () => switchActiveMix("sali"));
   document.getElementById("sound-mix-striimi-btn")?.addEventListener("click", () => switchActiveMix("striimi"));
   document.getElementById("sound-config-channels-btn")?.addEventListener("click", openChannelConfigModal);
+  document.getElementById("sound-reset-btn")?.addEventListener("click", openResetModal);
   document.getElementById("sound-refresh-btn")?.addEventListener("click", () => {
     void fetchInitialMixState();
     toastCallback?.("Mikserin tila päivitetty");
   });
 
-  // Modal events
+  // Visibility modal events
   document.getElementById("sound-modal-close-x")?.addEventListener("click", closeChannelConfigModal);
   document.getElementById("sound-modal-cancel-btn")?.addEventListener("click", closeChannelConfigModal);
   document.getElementById("sound-modal-save-btn")?.addEventListener("click", saveChannelConfigModal);
+
+  // Reset modal events
+  document.getElementById("sound-reset-cancel-btn")?.addEventListener("click", closeResetModal);
+  document.getElementById("sound-reset-confirm-btn")?.addEventListener("click", () => {
+    void confirmResetToDefaults();
+  });
 
   document.getElementById("sound-preset-messu-btn")?.addEventListener("click", () => setModalSelections(new Set(PRESET_MESSU)));
   document.getElementById("sound-preset-bandi-btn")?.addEventListener("click", () => setModalSelections(new Set(PRESET_BANDI)));
   document.getElementById("sound-preset-all-btn")?.addEventListener("click", () => setModalSelections(new Set(ALL_CHANNELS.map((c) => c.id))));
   document.getElementById("sound-preset-clear-btn")?.addEventListener("click", () => setModalSelections(new Set()));
+}
+
+function openResetModal(): void {
+  const modal = document.getElementById("sound-reset-modal") as HTMLDialogElement | null;
+  modal?.showModal();
+}
+
+function closeResetModal(): void {
+  const modal = document.getElementById("sound-reset-modal") as HTMLDialogElement | null;
+  modal?.close();
+}
+
+async function confirmResetToDefaults(): Promise<void> {
+  closeResetModal();
+  const res = await apiCall<{ ok?: boolean }>("POST", "/api/v1/reset");
+  if (res && res.ok !== false) {
+    toastCallback?.("Oletustilat palautettu (BLU-100 Preset 2 -10 dB)");
+  } else {
+    toastCallback?.("Oletusten palautus epäonnistui");
+  }
+  await fetchInitialMixState();
 }
 
 function switchActiveMix(mixId: ActiveMixId): void {
