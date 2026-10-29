@@ -1,5 +1,28 @@
 export type FrontendTabId = "outputs" | "inputs" | "cameras" | "youtube" | "tally" | "voice" | "radio" | "renderer" | "sound";
 
+export interface EcosystemComponent {
+  id: string;
+  tab: string;
+  name: string;
+  description: string;
+  active: boolean;
+  inUse: boolean;
+  available: boolean;
+  configured: boolean;
+  connecting: boolean;
+  lastSeenAt: string | null;
+  url?: string | null | undefined;
+  details?: Record<string, unknown> | undefined;
+}
+
+export interface EcosystemStatus {
+  service: "pigateway";
+  updatedAt: string;
+  inUseTabs: string[];
+  activePlugins: string[];
+  components: Record<string, EcosystemComponent>;
+}
+
 export type SourceId =
   | "hama"
   // NOTE: Future `hama2` virtual/duplicate source will be added here so we can send
@@ -200,5 +223,7 @@ declare global {
     handleAdHocCreateSubmit: () => void;
     handleConfirmStopBroadcast: () => void;
     triggerCamDirectorCue: (cue: any) => void;
+    triggerEcosystemProbe: () => void;
+    applyEcosystemVisibility: (eco: EcosystemStatus) => void;
   }
 }

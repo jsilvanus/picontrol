@@ -8,10 +8,22 @@ import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopB
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
+import { resolveApiUrl } from "./config";
 
-// Global Fetch Interceptor for Authentication
+// Global Fetch Interceptor for Gateway URL Routing & Authentication
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  let target: RequestInfo | URL = input;
+  if (typeof input === "string") {
+    if (input.startsWith("/api/") || input.startsWith("/multiview") || input.startsWith("/pipgm")) {
+      target = resolveApiUrl(input);
+    }
+  } else if (input instanceof URL) {
+    if (input.pathname.startsWith("/api/") || input.pathname.startsWith("/multiview") || input.pathname.startsWith("/pipgm")) {
+      target = resolveApiUrl(input.pathname + input.search + input.hash);
+    }
+  }
+
   const token = localStorage.getItem("pimatrix_auth_token");
   if (token) {
     init = init || {};
@@ -21,9 +33,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     }
     init.headers = headers;
   }
-  const response = await originalFetch(input, init);
+  const response = await originalFetch(target, init);
   if (response.status === 401) {
-    const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const urlStr = typeof target === "string" ? target : target instanceof URL ? target.href : target.url;
     if (!urlStr.includes("/api/v1/auth/verify")) {
       openAuthModal();
     }
@@ -34,6 +46,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
 import type {
   CameraSnapshot,
   EffectsPipeline,
+  EcosystemComponent,
+  EcosystemStatus,
   FrontendInitialState,
   FrontendTabId,
   MatrixRouteState,
@@ -241,6 +255,103 @@ function generatePresetThumbnailDataUrl(
     <text x="310" y="170" text-anchor="end" fill="#cbd5e1" font-family="JetBrains Mono, monospace" font-size="9">SNAP ${timestamp}</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// ============================================================================
+// Ecosystem & Conditional UI State
+// ============================================================================
+let latestEcosystem: EcosystemStatus | null = null;
+
+export function applyEcosystemVisibility(eco: EcosystemStatus): void {
+  latestEcosystem = eco;
+
+  // 1. Navigation items visibility in bottom bar
+  const navTabs: FrontendTabId[] = [
+    "sound",
+    "inputs",
+    "cameras",
+    "youtube",
+    "tally",
+    "voice",
+    "radio",
+    "renderer"
+  ];
+
+  for (const t of navTabs) {
+    const navEl = document.getElementById("nav-" + t);
+    if (!navEl) continue;
+    const inUse = eco.inUseTabs.includes(t);
+    navEl.classList.toggle("hidden", !inUse);
+    navEl.classList.toggle("flex", inUse);
+  }
+
+  // 2. Fast Sound navigation button in header
+  const topSoundBtn = document.getElementById("top-sound-btn");
+  if (topSoundBtn) {
+    const soundInUse = eco.inUseTabs.includes("sound");
+    topSoundBtn.classList.toggle("hidden", !soundInUse);
+    topSoundBtn.classList.toggle("inline-flex", soundInUse);
+  }
+
+  // 3. Header ecosystem badge
+  const ecoDot = document.getElementById("ecosystem-dot");
+  const ecoText = document.getElementById("ecosystem-status-text");
+  const count = eco.activePlugins?.length ?? 0;
+  if (ecoText) {
+    ecoText.textContent = `${count} Active`;
+  }
+  if (ecoDot) {
+    ecoDot.className = "w-2 h-2 rounded-full " + (count > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-500");
+  }
+
+  // 4. More destinations / All Applications modal tiles
+  const compMap: Record<string, string> = {
+    sound: "pisound",
+    radio: "radioRelay",
+    youtube: "pitube",
+    tally: "pilight",
+    inputs: "pimatrix",
+    cameras: "cameras",
+    voice: "pivoice",
+    renderer: "piprogram"
+  };
+
+  for (const [tabKey, compKey] of Object.entries(compMap)) {
+    const comp = eco.components?.[compKey];
+    const isCompActive = comp?.inUse ?? eco.inUseTabs.includes(tabKey);
+    const badge = document.getElementById("more-badge-" + tabKey);
+    if (badge) {
+      badge.className = "w-2 h-2 rounded-full absolute top-2.5 right-2.5 " + (isCompActive ? "bg-emerald-500" : "bg-slate-400");
+      badge.title = isCompActive ? `${comp?.name || tabKey}: Active / In Use` : `${comp?.name || tabKey}: Standby / Inactive`;
+    }
+    const tile = document.getElementById("more-tile-" + tabKey);
+    if (tile) {
+      tile.classList.toggle("opacity-60", !isCompActive);
+    }
+  }
+
+  // 5. If current tab is inactive and not outputs, fall back to outputs
+  if (activeTab !== "outputs" && !eco.inUseTabs.includes(activeTab)) {
+    switchTab("outputs", true);
+    showToast(`Navigated to Outputs (${activeTab} is currently not in use)`);
+  }
+}
+
+export async function triggerEcosystemProbe(): Promise<void> {
+  const btn = document.getElementById("more-probe-btn");
+  if (btn) btn.classList.add("opacity-50");
+  try {
+    const res = await fetch("/api/v1/ecosystem/probe", { method: "POST" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as EcosystemStatus;
+    applyEcosystemVisibility(data);
+    showToast(`Ecosystem probed: ${data.activePlugins.length} services active`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    showToast(`Probe failed: ${msg}`);
+  } finally {
+    if (btn) btn.classList.remove("opacity-50");
+  }
 }
 
 // ============================================================================
@@ -2213,13 +2324,24 @@ async function refreshOutputsState(): Promise<void> {
 }
 
 function connectSse(): void {
-  const sse = new EventSource("/api/v1/events");
+  const sse = new EventSource(resolveApiUrl("/api/v1/events?client=picontrol"));
   const sseDot = document.getElementById("sse-dot");
   const sseText = document.getElementById("sse-status-text");
 
   sse.addEventListener("open", () => {
     if (sseDot) sseDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
     if (sseText) sseText.textContent = "ONLINE";
+  });
+
+  sse.addEventListener("ecosystem", (e) => {
+    try {
+      const payload = JSON.parse((e as MessageEvent).data) as EcosystemStatus;
+      if (payload && Array.isArray(payload.inUseTabs)) {
+        applyEcosystemVisibility(payload);
+      }
+    } catch {
+      // ignore
+    }
   });
 
   sse.addEventListener("output", (e) => {
@@ -2338,6 +2460,8 @@ window.switchTab = (tab) => switchTab(tab, true);
 window.openMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.showModal();
 window.closeMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.close();
 window.selectMoreTab = (tab: FrontendTabId) => { switchTab(tab); window.closeMoreModal(); };
+window.triggerEcosystemProbe = () => void triggerEcosystemProbe();
+window.applyEcosystemVisibility = (eco: EcosystemStatus) => applyEcosystemVisibility(eco);
 window.closeYoutubeCreateModal = () => (document.getElementById("youtube-create-modal") as HTMLDialogElement)?.close();
 window.closeYoutubeStopModal = () => (document.getElementById("youtube-stop-modal") as HTMLDialogElement)?.close();
 window.handleAdHocCreateSubmit = () => {
@@ -2584,6 +2708,15 @@ async function bootstrap(): Promise<void> {
 
   await fetchInitialFromApiIfNeeded();
   syncCameraLabelsFromEnvAndBackend();
+
+  void fetch("/api/v1/ecosystem")
+    .then((r) => (r.ok ? (r.json() as Promise<EcosystemStatus>) : null))
+    .then((eco) => {
+      if (eco?.inUseTabs) {
+        applyEcosystemVisibility(eco);
+      }
+    })
+    .catch(() => undefined);
 
   switchTab(activeTab, false);
   renderOutputsTab();

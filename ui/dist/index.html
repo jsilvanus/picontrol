@@ -9,9 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/main-CGXRNuZJ.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="stylesheet" crossorigin href="/assets/main-D00yh-V2.css">
+  <script type="module" crossorigin src="./assets/main-DAjmVtv-.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="stylesheet" crossorigin href="./assets/main-aj9SIq3Q.css">
 </head>
 <body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen selection:bg-primary selection:text-on-primary">
 
@@ -31,8 +31,8 @@
       </div>
 
       <div class="flex items-center gap-2 flex-shrink-0">
-        <!-- Fast Navigation to Sound Mixer -->
-        <button id="top-sound-btn" type="button" onclick="switchTab('sound')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed text-on-primary-fixed border border-primary/20 text-[10px] font-label-sm font-bold uppercase transition-all hover:bg-primary hover:text-on-primary active:scale-95">
+        <!-- Fast Navigation to Sound Mixer (Conditional) -->
+        <button id="top-sound-btn" type="button" onclick="switchTab('sound')" class="hidden items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed text-on-primary-fixed border border-primary/20 text-[10px] font-label-sm font-bold uppercase transition-all hover:bg-primary hover:text-on-primary active:scale-95">
           <span class="material-symbols-outlined text-[14px]">tune</span>
           <span>Ääni</span>
         </button>
@@ -61,14 +61,17 @@
           <span class="text-tertiary" id="lockLabel">UNLOCKED</span>
         </button>
 
-        <!-- Camera View Focus Toggle (shown on Cameras tab) -->
-        
-
         <!-- Live SSE Status Pill -->
         <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high border border-outline-variant/30 text-on-surface-variant text-[10px] font-label-sm font-semibold">
           <span class="w-2 h-2 rounded-full bg-primary animate-pulse" id="sse-dot"></span>
           <span id="sse-status-text">ONLINE</span>
         </div>
+
+        <!-- Ecosystem Status Pill (triggers More Modal) -->
+        <button id="top-ecosystem-btn" type="button" onclick="openMoreModal()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-container-highest border border-outline-variant/30 text-on-surface-variant text-[10px] font-label-sm font-semibold transition-all active:scale-95" title="Pi Ecosystem Status">
+          <span class="w-2 h-2 rounded-full bg-emerald-500" id="ecosystem-dot"></span>
+          <span id="ecosystem-status-text">Ecosystem</span>
+        </button>
       </div>
     </div>
   </header>
@@ -686,6 +689,21 @@
       <div id="sound-root" class="space-y-space-md"></div>
     </section>
 
+    <!-- TAB 7: YOUTUBE (pitube) -->
+    <section id="tab-youtube" class="tab-panel w-full px-margin pb-6 gap-space-md pt-4 space-y-space-md">
+      <div id="youtube-root" class="space-y-space-md"></div>
+    </section>
+
+    <!-- TAB 8: TALLY (pilight) -->
+    <section id="tab-tally" class="tab-panel w-full px-margin pb-6 gap-space-md pt-4 space-y-space-md">
+      <div id="tally-root" class="space-y-space-md"></div>
+    </section>
+
+    <!-- TAB 9: RADIO (web-radio-relay) -->
+    <section id="tab-radio" class="tab-panel w-full px-margin pb-6 gap-space-md pt-4 space-y-space-md">
+      <div id="radio-root" class="space-y-space-md"></div>
+    </section>
+
   </main>
 
   <!-- =================================================================== -->
@@ -1158,30 +1176,50 @@
 
   <!-- BOTTOM FIXED NAVIGATION BAR -->
   <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface-container-low/95 backdrop-blur-xl shadow-[0_-2px_10px_rgba(0,0,0,0.05)] border-t border-outline-variant/25">
-    <div class="flex items-center justify-around h-16 px-space-xs max-w-2xl mx-auto">
-      <a href="#outputs" id="nav-outputs" onclick="switchTab('outputs'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
+    <div id="bottom-nav-container" class="flex items-center justify-around h-16 px-space-xs max-w-2xl mx-auto overflow-x-auto">
+      <a href="#outputs" id="nav-outputs" onclick="switchTab('outputs'); return false;" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">settings_input_hdmi</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Outputs</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Outputs</span>
       </a>
-      <a href="#inputs" id="nav-inputs" onclick="switchTab('inputs'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
+      <a href="#sound" id="nav-sound" onclick="switchTab('sound'); return false;" class="hidden flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[20px]">tune</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Sound</span>
+      </a>
+      <a href="#inputs" id="nav-inputs" onclick="switchTab('inputs'); return false;" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">router</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Inputs</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Inputs</span>
       </a>
-      <a href="#cameras" id="nav-cameras" onclick="switchTab('cameras'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
+      <a href="#cameras" id="nav-cameras" onclick="switchTab('cameras'); return false;" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">videocam</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Video</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Video</span>
       </a>
-      <a href="#renderer" id="nav-renderer" onclick="switchTab('renderer'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
-        <span class="material-symbols-outlined text-[20px]">layers</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Renderer</span>
+      <a href="#youtube" id="nav-youtube" onclick="switchTab('youtube'); return false;" class="hidden flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[20px]">smart_display</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Stream</span>
       </a>
-      <a href="#voice" id="nav-voice" onclick="switchTab('voice'); return false;" class="flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg transition-all">
+      <a href="#tally" id="nav-tally" onclick="switchTab('tally'); return false;" class="hidden flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[20px]">highlight</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Tally</span>
+      </a>
+      <a href="#voice" id="nav-voice" onclick="switchTab('voice'); return false;" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[20px]">record_voice_over</span>
-        <span class="font-label-sm text-label-sm uppercase tracking-wider">Voice</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Voice</span>
       </a>
+      <a href="#radio" id="nav-radio" onclick="switchTab('radio'); return false;" class="hidden flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[20px]">radio</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Radio</span>
+      </a>
+      <a href="#renderer" id="nav-renderer" onclick="switchTab('renderer'); return false;" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[20px]">layers</span>
+        <span class="font-label-sm text-[10px] uppercase tracking-wider">Render</span>
+      </a>
+      <button type="button" id="nav-more" onclick="openMoreModal()" class="flex flex-col items-center justify-center min-w-[52px] sm:min-w-[64px] h-11 px-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-95">
+        <span class="material-symbols-outlined text-[20px]">apps</span>
+        <span id="nav-more-label" class="font-label-sm text-[10px] uppercase tracking-wider">More</span>
+      </button>
     </div>
   </nav>
-
+
 
   <!-- =================================================================== -->
   <!-- CONTROL AUTHENTICATION MODAL (<dialog>)                             -->
@@ -1303,40 +1341,88 @@
             <span class="font-label-sm text-[10px] text-on-surface-variant uppercase">Ecosystem Control Center</span>
           </div>
         </div>
-        <button type="button" class="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface flex items-center justify-center" onclick="closeMoreModal()">
-          <span class="material-symbols-outlined text-[16px]">close</span>
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button type="button" id="more-probe-btn" onclick="triggerEcosystemProbe()" class="px-2 py-1 rounded bg-surface-container hover:bg-surface-container-highest text-primary font-label-sm text-[10px] uppercase font-bold flex items-center gap-1 transition-all" title="Actively probe all ecosystem components">
+            <span class="material-symbols-outlined text-[14px]">sensors</span>
+            <span>Probe</span>
+          </button>
+          <button type="button" class="w-7 h-7 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface flex items-center justify-center" onclick="closeMoreModal()">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 pt-1">
-        <button type="button" onclick="selectMoreTab('sound')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs">
+      <div class="grid grid-cols-2 gap-2 pt-1" id="more-modal-grid">
+        <!-- 1. Äänimikseri (PiSound) -->
+        <button type="button" id="more-tile-sound" data-tab="sound" onclick="selectMoreTab('sound')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-sound" title="Active"></span>
           <span class="material-symbols-outlined text-[24px]">tune</span>
           <span class="font-label-sm text-[11px] uppercase font-bold">Äänimikseri</span>
-          <span class="text-[9px] text-on-surface-variant">Sali & Striimi</span>
+          <span class="text-[9px] text-on-surface-variant">Sali & Striimi DSP</span>
         </button>
 
-        <button type="button" onclick="selectMoreTab('radio')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs">
+        <!-- 2. Web Radio (radioRelay) -->
+        <button type="button" id="more-tile-radio" data-tab="radio" onclick="selectMoreTab('radio')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-slate-400 absolute top-2.5 right-2.5" id="more-badge-radio" title="Standby"></span>
           <span class="material-symbols-outlined text-[24px]">radio</span>
           <span class="font-label-sm text-[11px] uppercase font-bold">Web Radio</span>
-          <span class="text-[9px] text-on-surface-variant">Live Icecast Relay</span>
+          <span class="text-[9px] text-on-surface-variant">Icecast Relay</span>
         </button>
 
-        <button type="button" onclick="selectMoreTab('inputs')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs">
+        <!-- 3. YouTube Live (PiTube) -->
+        <button type="button" id="more-tile-youtube" data-tab="youtube" onclick="selectMoreTab('youtube')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-slate-400 absolute top-2.5 right-2.5" id="more-badge-youtube" title="Standby"></span>
+          <span class="material-symbols-outlined text-[24px]">smart_display</span>
+          <span class="font-label-sm text-[11px] uppercase font-bold">YouTube Live</span>
+          <span class="text-[9px] text-on-surface-variant">Stream & Monitor</span>
+        </button>
+
+        <!-- 4. Tally Lights (PiLight) -->
+        <button type="button" id="more-tile-tally" data-tab="tally" onclick="selectMoreTab('tally')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-slate-400 absolute top-2.5 right-2.5" id="more-badge-tally" title="Standby"></span>
+          <span class="material-symbols-outlined text-[24px]">highlight</span>
+          <span class="font-label-sm text-[11px] uppercase font-bold">Tally-Ma</span>
+          <span class="text-[9px] text-on-surface-variant">Wireless Cues</span>
+        </button>
+
+        <!-- 5. Matrix Inputs (PiMatrix / AMX) -->
+        <button type="button" id="more-tile-inputs" data-tab="inputs" onclick="selectMoreTab('inputs')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-inputs" title="Active"></span>
           <span class="material-symbols-outlined text-[24px]">router</span>
           <span class="font-label-sm text-[11px] uppercase font-bold">Matrix Inputs</span>
-          <span class="text-[9px] text-on-surface-variant">Atlona 4x4 Switcher</span>
+          <span class="text-[9px] text-on-surface-variant">Atlona Switcher</span>
         </button>
 
-        <button type="button" onclick="selectMoreTab('renderer')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs">
+        <!-- 6. Video & Cameras (ATEM / PTZ) -->
+        <button type="button" id="more-tile-cameras" data-tab="cameras" onclick="selectMoreTab('cameras')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-cameras" title="Active"></span>
+          <span class="material-symbols-outlined text-[24px]">videocam</span>
+          <span class="font-label-sm text-[11px] uppercase font-bold">Video & ATEM</span>
+          <span class="text-[9px] text-on-surface-variant">PTZ Presets</span>
+        </button>
+
+        <!-- 7. Voice (PiVoice) -->
+        <button type="button" id="more-tile-voice" data-tab="voice" onclick="selectMoreTab('voice')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-slate-400 absolute top-2.5 right-2.5" id="more-badge-voice" title="Standby"></span>
+          <span class="material-symbols-outlined text-[24px]">record_voice_over</span>
+          <span class="font-label-sm text-[11px] uppercase font-bold">Voice & VAD</span>
+          <span class="text-[9px] text-on-surface-variant">Auditor STT</span>
+        </button>
+
+        <!-- 8. PiPGM Renderer (PiProgram) -->
+        <button type="button" id="more-tile-renderer" data-tab="renderer" onclick="selectMoreTab('renderer')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-slate-400 absolute top-2.5 right-2.5" id="more-badge-renderer" title="Standby"></span>
           <span class="material-symbols-outlined text-[24px]">layers</span>
           <span class="font-label-sm text-[11px] uppercase font-bold">PiPGM Renderer</span>
-          <span class="text-[9px] text-on-surface-variant">Graphics Pipeline</span>
+          <span class="text-[9px] text-on-surface-variant">Slides & Pipeline</span>
         </button>
 
-        <a href="/multiview" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs">
+        <!-- 9. Multiview Screen -->
+        <a href="/multiview" id="more-tile-multiview" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-multiview" title="Active"></span>
           <span class="material-symbols-outlined text-[24px]">grid_view</span>
           <span class="font-label-sm text-[11px] uppercase font-bold">Multiview</span>
-          <span class="text-[9px] text-on-surface-variant">Separate Monitor</span>
+          <span class="text-[9px] text-on-surface-variant">External Display</span>
         </a>
       </div>
 

@@ -2,11 +2,35 @@
  * Gateway & Pi ecosystem API client for picontrol CLI.
  */
 
+export interface EcosystemComponent {
+  id: string;
+  tab: string;
+  name: string;
+  description: string;
+  active: boolean;
+  inUse: boolean;
+  available: boolean;
+  configured: boolean;
+  connecting: boolean;
+  lastSeenAt: string | null;
+  url?: string | null | undefined;
+  details?: Record<string, unknown> | undefined;
+}
+
+export interface EcosystemStatus {
+  service: "pigateway";
+  updatedAt: string;
+  inUseTabs: string[];
+  activePlugins: string[];
+  components: Record<string, EcosystemComponent>;
+}
+
 export interface CliConfig {
   gatewayUrl: string;
   youtubeUrl?: string;
   tallyUrl?: string;
   voiceUrl?: string;
+  soundUrl?: string;
   apiKey?: string;
   json?: boolean;
 }
@@ -16,6 +40,7 @@ export class GatewayClient {
   readonly youtubeUrl: string;
   readonly tallyUrl: string;
   readonly voiceUrl: string;
+  readonly soundUrl: string;
   readonly apiKey?: string;
   readonly json: boolean;
 
@@ -24,6 +49,7 @@ export class GatewayClient {
     this.youtubeUrl = (config.youtubeUrl || "http://127.0.0.1:3105").replace(/\/+$/, "");
     this.tallyUrl = (config.tallyUrl || "http://127.0.0.1:3200").replace(/\/+$/, "");
     this.voiceUrl = (config.voiceUrl || "http://127.0.0.1:3101").replace(/\/+$/, "");
+    this.soundUrl = (config.soundUrl || "http://127.0.0.1:3300").replace(/\/+$/, "");
     this.apiKey = config.apiKey || process.env.PIGATEWAY_API_KEY;
     this.json = Boolean(config.json);
   }
@@ -67,9 +93,34 @@ export class GatewayClient {
     }
   }
 
-  // --- Gateway General Status ---
+  // --- Gateway General Status & Ecosystem ---
   async getStatus(): Promise<Record<string, unknown>> {
     return this.request(this.gatewayUrl, "/api/v1/status");
+  }
+
+  async getEcosystem(): Promise<EcosystemStatus> {
+    return this.request<EcosystemStatus>(this.gatewayUrl, "/api/v1/ecosystem");
+  }
+
+  async probeEcosystem(): Promise<EcosystemStatus> {
+    return this.request<EcosystemStatus>(this.gatewayUrl, "/api/v1/ecosystem/probe", "POST");
+  }
+
+  // --- PiSound direct or gateway proxy ---
+  async getSoundStatus(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.soundUrl, "/api/v1/status");
+    } catch {
+      return await this.request(this.gatewayUrl, "/api/v1/sound");
+    }
+  }
+
+  async probeSound(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.soundUrl, "/api/v1/probe", "POST");
+    } catch {
+      return await this.request(this.soundUrl, "/health");
+    }
   }
 
   // --- YouTube / pitube ---

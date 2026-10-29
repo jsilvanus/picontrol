@@ -10,6 +10,8 @@ USAGE:
 
 COMMANDS:
   status                     Show overall Pi ecosystem & gateway status
+  ecosystem [status|probe]   Query or actively probe all components across the Pi ecosystem
+  sound [status|probe]       Check or actively probe PiSound BLU-100 DSP status
   youtube <action> [...]     Manage YouTube broadcasts (status, list, select, create, start, stop)
   tally <action> [...]       Control Tally-Ma lights & director cues (list, set, cue, call, hold, brightness, cycle)
   voice <action> [...]       Control pivoice audio capture & speech status (status, capture)
@@ -43,6 +45,7 @@ async function main(): Promise<void> {
     tallyUrl: process.env.PILIGHT_URL || "http://127.0.0.1:3200",
     voiceUrl: process.env.PIVOICE_URL || "http://127.0.0.1:3101",
     apiKey: process.env.PIGATEWAY_API_KEY,
+    soundUrl: process.env.PISOUND_URL || "http://127.0.0.1:3300",
     json: false,
   };
 
@@ -57,6 +60,8 @@ async function main(): Promise<void> {
       config.tallyUrl = args[++i]!;
     } else if (arg === "--voice" && i + 1 < args.length) {
       config.voiceUrl = args[++i]!;
+    } else if (arg === "--sound" && i + 1 < args.length) {
+      config.soundUrl = args[++i]!;
     } else if (arg === "--api-key" && i + 1 < args.length) {
       config.apiKey = args[++i]!;
     } else if (arg === "--json") {
@@ -86,11 +91,69 @@ async function main(): Promise<void> {
           console.log("=== Pi Ecosystem Status ===");
           console.log(`Service:      ${res.service || "pigateway"}`);
           console.log(`Mode:         ${res.mode || "unknown"}`);
+          if (Array.isArray(res.inUseTabs)) {
+            console.log(`In-Use Tabs:  ${res.inUseTabs.join(", ")}`);
+          }
+          if (Array.isArray(res.activePlugins)) {
+            console.log(`Active Items: ${res.activePlugins.join(", ")}`);
+          }
           console.log(`YouTube:      ${(res.youtube as any)?.state || "unknown"}`);
           console.log(`ATEM:         ${(res.atem as any)?.connected ? "CONNECTED" : "DISCONNECTED"}`);
           console.log(`Encoder:      ${(res.encoder as any)?.connected ? "CONNECTED" : "STANDBY"}`);
           console.log(`Radio Relay:  ${(res.radioRelay as any)?.reachable ? "ONLINE" : "STANDBY"}`);
           console.log(`Cameras:      ${Array.isArray(res.cameras) ? res.cameras.map((c: any) => `${c.id} (${c.connection})`).join(", ") : "none"}`);
+        }
+        break;
+      }
+
+      case "ecosystem": {
+        const action = sub || "status";
+        const eco = action === "probe"
+          ? await client.probeEcosystem()
+          : await client.getEcosystem();
+
+        if (config.json) {
+          console.log(JSON.stringify(eco, null, 2));
+        } else {
+          console.log(`=== Pi Ecosystem Control Plane (${action.toUpperCase()}) ===`);
+          console.log(`Updated:      ${eco.updatedAt}`);
+          console.log(`In-Use Tabs:  ${eco.inUseTabs.join(", ") || "none"}`);
+          console.log(`Active Items: ${eco.activePlugins.join(", ") || "none"}\n`);
+          console.log("Components:");
+          for (const [id, comp] of Object.entries(eco.components)) {
+            const statusBadge = comp.inUse ? "IN USE " : comp.available ? "ONLINE " : "OFFLINE";
+            console.log(`  [${statusBadge}] ${id.padEnd(12)} -> Tab: ${comp.tab.padEnd(10)} | ${comp.name}`);
+            if (comp.url) console.log(`               URL: ${comp.url}`);
+          }
+        }
+        break;
+      }
+
+      case "sound": {
+        const action = sub || "status";
+        const result = action === "probe"
+          ? await client.probeSound()
+          : await client.getSoundStatus();
+
+        if (config.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(`=== PiSound Audio DSP (${action.toUpperCase()}) ===`);
+          if (action === "probe") {
+            const soundweb = (result.soundweb as any) || {};
+            console.log(`Reachable:    ${result.ok ? "YES" : "NO"}`);
+            console.log(`Soundweb:     ${soundweb.host}:${soundweb.port} (${soundweb.status || "unknown"})`);
+            if (result.telemetry) {
+              const tel = result.telemetry as any;
+              console.log(`Telemetry:    ${tel.running ? "ACTIVE" : "STANDBY"} -> ${tel.host}:${tel.port}`);
+            }
+          } else {
+            console.log(`Status:       ${result.status || "unknown"}`);
+            console.log(`Mode:         ${result.mode || "unknown"}`);
+            console.log(`DSP Host:     ${result.host}:${result.port}`);
+            console.log(`Wireless On:  ${result.activeWirelessCount ?? "N/A"}`);
+            console.log(`Wired On:     ${result.activeWiredCount ?? "N/A"}`);
+          }
         }
         break;
       }

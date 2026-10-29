@@ -134,7 +134,28 @@ picontrol camera preset cam1 3 --save                     # Save current positio
 
 ---
 
-## 3. Testing & Building Everything
+## 3. Production Deployment (Nginx & Reverse Proxy)
+
+In production, `picontrol` is deployed as a **static build** served directly by **Nginx** at the church domain (e.g. `keskuskirkko.fi`).
+
+### Architecture Highlights
+- **Static Assets**: Nginx serves the pre-compiled UI (`ui/dist`) directly with aggressive asset caching.
+- **Local Domain & Router Split-DNS**: The local church router overrides DNS so all devices on the LAN resolve `keskuskirkko.fi` directly to the local Pi's IP address. The Pi is also configured locally in `/etc/hosts` to answer to that domain name.
+- **Reverse Proxy Routing**:
+  - `/api/...` & `/multiview`: Proxied to `pigateway` (`http://127.0.0.1:3100`) with unbuffered SSE support for `/api/v1/events`.
+  - `/mcp`: Proxied to `picontrol-mcp` (`http://127.0.0.1:3200`) for AI agent tool execution and OAuth/PAT headers.
+  - `/canva` (or dedicated port `:8443`): Proxied to `picanva` (`http://127.0.0.1:3103`) for slide generation.
+
+- **Authentication & Rights**:
+  - **Operator Fail-Safe**: Physical sound booth console / LAN subnet is guaranteed full operator rights (`*:write`) to ensure an operator is never locked out during a service.
+  - **User-Based Remote Control**: Multi-user and remote access uses individual **Username & Password** authentication with granular, user-level rights (`extraGrants` / `extraDenies`). See **[docs/authentication-and-permissions.md](docs/authentication-and-permissions.md)**.
+
+Detailed setup instructions and systemd service templates are in **[docs/deployment.md](docs/deployment.md)**.  
+Reference Nginx configuration: **[deploy/nginx/picontrol.conf](deploy/nginx/picontrol.conf)**.
+
+---
+
+## 4. Testing & Building Everything
 
 ```sh
 npm test         # Runs unit and integration test suite
