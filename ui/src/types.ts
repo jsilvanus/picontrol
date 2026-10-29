@@ -1,4 +1,4 @@
-export type FrontendTabId = "outputs" | "inputs" | "cameras" | "renderer" | "voice";
+export type FrontendTabId = "outputs" | "inputs" | "cameras" | "youtube" | "tally" | "voice" | "radio" | "renderer";
 
 export type SourceId =
   | "hama"
@@ -192,5 +192,13 @@ declare global {
     compSendSlide: () => Promise<void>;
     compResize: (action: "in" | "out") => Promise<void>;
     adjustPtzSpeed: (delta: number) => void;
+    openMoreModal: () => void;
+    closeMoreModal: () => void;
+    selectMoreTab: (tab: FrontendTabId) => void;
+    closeYoutubeCreateModal: () => void;
+    closeYoutubeStopModal: () => void;
+    handleAdHocCreateSubmit: () => void;
+    handleConfirmStopBroadcast: () => void;
+    triggerCamDirectorCue: (cue: any) => void;
   }
 }

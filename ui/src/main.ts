@@ -4,6 +4,9 @@ import { bindBackdropDismiss } from "./dialog-dismiss";
 import { initQuickOptions } from "./quick-options";
 import { initCompositeTab, setCompositeContext } from "./composite-tab";
 import { initVoiceTab, setVoiceTabActive } from "./voice-tab";
+import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopBroadcast } from "./youtube-tab";
+import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
+import { initRadioTab, setRadioTabActive } from "./radio-tab";
 
 // Global Fetch Interceptor for Authentication
 const originalFetch = window.fetch.bind(window);
@@ -97,17 +100,18 @@ function syncCameraLabelsFromEnvAndBackend(): void {
 }
 
 const MATRIX_INPUT_NAMES: Record<number, string> = {
-  1: "LECTERN",
-  2: "RACK PC",
-  3: "PI 1",
-  4: "PI 2"
+  1: "LUKUPULPETTI (Lectern)",
+  2: "RÄKKI (Operator PC)",
+  3: "PI 1 (PiPGM 1)",
+  4: "PI 2 (PiPGM 2)"
 };
 
 const MATRIX_DEST_NAMES: Record<number, string> = {
-  1: "Projector 1",
-  2: "Projector 2",
-  3: "Screen",
-  4: "Videomikseri"
+  1: "Videotykki 1 (Vasen)",
+  2: "Videotykki 2 (Oikea)",
+  3: "(none currently)",
+  4: "(none currently)",
+  5: "Videomikseri"
 };
 
 const DEFAULT_PRESET_NAMES: Record<string, Record<number, string>> = {
@@ -139,7 +143,7 @@ const pipgmMap = new Map<string, PiPgmPipelineSnapshot>();
 let multiviewLayout: "auto" | "landscape" | "portrait" = "landscape";
 let matrixState: MatrixRouteState = {
   locked: false,
-  routes: { 1: 1, 2: 2, 3: null, 4: 3 }
+  routes: { 1: 1, 2: 2, 3: null, 4: null, 5: 2 }
 };
 let rtspOut: RtspOutState = {
   sourceId: "rtmp1",
@@ -243,7 +247,7 @@ function generatePresetThumbnailDataUrl(
 // ============================================================================
 function switchTab(tab: FrontendTabId, pushUrl = true): void {
   activeTab = tab;
-  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "renderer", "voice"];
+  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer"];
   for (const t of tabs) {
     const panel = document.getElementById("tab-" + t);
     const nav = document.getElementById("nav-" + t);
@@ -253,11 +257,26 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (nav) {
       if (t === tab) {
         nav.className =
-          "flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg bg-primary text-on-primary shadow-sm transition-all active:scale-95";
+          "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg bg-primary text-on-primary shadow-sm transition-all active:scale-95";
       } else {
         nav.className =
-          "flex flex-col items-center justify-center min-w-[72px] h-11 px-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-95";
+          "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all active:scale-95";
       }
+    }
+  }
+
+  const moreBtn = document.getElementById("nav-more");
+  const moreLabel = document.getElementById("nav-more-label");
+  const isOverflowTab = tab === "radio" || tab === "inputs" || tab === "renderer";
+  if (moreBtn) {
+    if (isOverflowTab) {
+      moreBtn.className = "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg bg-primary text-on-primary shadow-sm transition-all active:scale-95";
+      if (moreLabel) {
+        moreLabel.textContent = tab === "radio" ? "Radio" : tab === "inputs" ? "Matrix" : "Render";
+      }
+    } else {
+      moreBtn.className = "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high active:scale-95";
+      if (moreLabel) moreLabel.textContent = "More";
     }
   }
 
@@ -283,26 +302,44 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (icon) icon.textContent = "videocam";
     if (title) title.textContent = "Video";
     if (subtitle) subtitle.textContent = "Cameras, Presets & ATEM";
-  } else if (tab === "renderer") {
-    if (icon) icon.textContent = "layers";
-    if (title) title.textContent = "PiPGM Renderer";
-    if (subtitle) subtitle.textContent = "Stub Placeholder";
+  } else if (tab === "youtube") {
+    if (icon) icon.textContent = "smart_display";
+    if (title) title.textContent = "YouTube Live";
+    if (subtitle) subtitle.textContent = "pitube Broadcast & Confidence Monitor";
+  } else if (tab === "tally") {
+    if (icon) icon.textContent = "highlight";
+    if (title) title.textContent = "Tally Lights";
+    if (subtitle) subtitle.textContent = "Tally-Ma Wireless & PTZ Cues";
   } else if (tab === "voice") {
     if (icon) icon.textContent = "record_voice_over";
     if (title) title.textContent = "Voice";
     if (subtitle) subtitle.textContent = "pivoice capture, transcription and captions";
+  } else if (tab === "radio") {
+    if (icon) icon.textContent = "radio";
+    if (title) title.textContent = "Web Radio";
+    if (subtitle) subtitle.textContent = "Icecast2 Relay Transmission";
+  } else if (tab === "renderer") {
+    if (icon) icon.textContent = "layers";
+    if (title) title.textContent = "PiPGM Renderer";
+    if (subtitle) subtitle.textContent = "Stub Placeholder";
   }
 
   updateAtemPolling();
+  setYoutubeTabActive(tab === "youtube");
+  setTallyTabActive(tab === "tally");
   setVoiceTabActive(tab === "voice");
+  setRadioTabActive(tab === "radio");
 
   if (pushUrl && window.history && window.history.replaceState) {
     const pathMap: Record<FrontendTabId, string> = {
       outputs: "/outputs",
       inputs: "/inputs",
       cameras: "/cameras",
-      renderer: "/pipgm",
-      voice: "/voice"
+      youtube: "/youtube",
+      tally: "/tally",
+      voice: "/voice",
+      radio: "/radio",
+      renderer: "/pipgm"
     };
     window.history.replaceState(null, "", pathMap[tab]);
   }
@@ -575,7 +612,7 @@ function renderRoutedToBadges(): void {
     const dests: string[] = [];
     for (const [outStr, inNum] of Object.entries(matrixState.routes || {})) {
       const outNum = Number(outStr);
-      if (outNum === 3) continue; // Screen disabled
+      if (outNum === 3 || outNum === 4) continue; // Unused
       if (inNum === atlonaInput && MATRIX_DEST_NAMES[outNum]) {
         dests.push(MATRIX_DEST_NAMES[outNum]);
       }
@@ -1349,7 +1386,7 @@ function renderMatrixTab(): void {
     }
   }
 
-  for (const outNum of [1, 2, 4]) {
+  for (const outNum of [1, 2, 5]) {
     const activeIn = matrixState.routes?.[outNum] || 1;
     const statusEl = document.getElementById(`matrix-out-${outNum}-status`);
     if (statusEl) {
@@ -2282,6 +2319,31 @@ function connectSse(): void {
 
 // Expose global handlers for inline onclick attributes
 window.switchTab = (tab) => switchTab(tab, true);
+window.openMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.showModal();
+window.closeMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.close();
+window.selectMoreTab = (tab: FrontendTabId) => { switchTab(tab); window.closeMoreModal(); };
+window.closeYoutubeCreateModal = () => (document.getElementById("youtube-create-modal") as HTMLDialogElement)?.close();
+window.closeYoutubeStopModal = () => (document.getElementById("youtube-stop-modal") as HTMLDialogElement)?.close();
+window.handleAdHocCreateSubmit = () => {
+  const title = (document.getElementById("yt-create-title") as HTMLInputElement)?.value.trim();
+  const privacy = (document.getElementById("yt-create-privacy") as HTMLSelectElement)?.value as "public" | "unlisted" | "private";
+  const desc = (document.getElementById("yt-create-desc") as HTMLTextAreaElement)?.value.trim();
+  if (!title) {
+    alert("Sy�t� l�hetykselle otsikko.");
+    return;
+  }
+  window.closeYoutubeCreateModal();
+  void submitAdHocBroadcast(title, privacy, desc);
+};
+window.handleConfirmStopBroadcast = () => {
+  window.closeYoutubeStopModal();
+  void executeStopBroadcast();
+};
+window.triggerCamDirectorCue = (cue: any) => {
+  const targetTally = selectedCameraId === "cam2" ? "tally02" : "tally01";
+  void sendDirectorCue(targetTally, cue);
+};
+
 window.selectHdmiSource = selectHdmiSource;
 window.openAuxModal = openAuxModal;
 window.closeAuxModal = closeAuxModal;
@@ -2486,6 +2548,12 @@ async function bootstrap(): Promise<void> {
   initCompositeTab(showToast);
   initQuickOptions(showToast, refreshOutputsState);
   initVoiceTab();
+  const ytRoot = document.getElementById("youtube-root");
+  if (ytRoot) initYoutubeTab(ytRoot);
+  const tallyRoot = document.getElementById("tally-root");
+  if (tallyRoot) initTallyTab(tallyRoot);
+  const radioRoot = document.getElementById("radio-root");
+  if (radioRoot) initRadioTab(radioRoot);
   void fetch("/api/v1/composites/compose1")
     .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
     .then((c) => {

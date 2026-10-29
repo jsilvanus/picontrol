@@ -1,15 +1,142 @@
 # picontrol
 
-UI housing for pimatrix, pivoice and piprogram. Controls cameras, the video mixer, Pi inputs and outputs, piprogram and pivoice.
+Ecosystem UI housing and CLI for the Pi stack: `pigateway`, `pimatrix`, `pitube`, `pilight`, `pivoice`, and `piprogram`.
 
-Status: phase A. The browser UI from `jsilvanus/pimatrix` (`packages/web`) is copied into `ui/`. Types will come from each service's OpenAPI.
+Provides **UI**, **CLI**, and **control plane access** for all church broadcast operations.
 
-Multiview: served from picontrol as a client-side page (`ui/multiview.html`, `ui/src/multiview/`). It reads the pimatrix API over HTTP, base URL from `?api=` or `VITE_PIMATRIX_URL`. pimatrix still serves its own `/multiview` until this is deployed. Cross-origin use needs CORS on pimatrix or a same-origin proxy.
+---
 
-Main UI (`ui/index.html`, `ui/src/main.ts`): the PiMatrix main UI is the one UI; the devices page was folded into it.
-- **Video** page (was Cameras): tap a camera view to enter single view, tap it again to go back to double view. Single view has the parameter matrix, presets, PTZ movement and the Focus buttons (Auto, Manual, Privacy Blur). SmartFrame is gone from the preset cards.
-- **ATEM view** (double view only, `ui/src/atem.ts`): inputs 1, 2, 3 (tap sets preview; green = preview, red = program), FTB, CUT, AUTO, and DSK 1 (Input 4) / DSK 2 (Media player) with TIE and ON AIR for the selected DSK. It polls `GET /api/v1/atem` once a second while visible and only sends a command when a button is pressed. Needs the ATEM endpoints from pimatrix PR #28.
-- **Crop & Effects** (long-press an input row in Outputs): tabs Crop (as before) and Composite (`ui/src/composite-tab.ts`): the slide frame of `/api/v1/composites` with a preview, a draggable frame, Left/Right/10:16/9:16/Reset presets, nudge and Smaller/Larger. Needs `offsetY` from pimatrix PR #28. `composite.html` stays for key colour, slide upload and ATEM media settings ("More settings").
-- Checked with a mock API in headless Chromium only; never run against a live pimatrix, ATEM or cameras.
+## Architecture & Responsibilities
 
-Composite: `composite.html` (`ui/src/composite/`) is the slide composite card for pimatrix's `/api/v1/composites`. It shows both outputs as tabs: `compose1` (HDMI key: full-frame key page, slide at left or right, key colour and chroma/luma mode) and `compose2` (ATEM media pool: media slot, media player, DSK, auto on air). It can start and stop each output, switch the slide side, save the frame and slide settings, preview the key page as a PNG, and send a test slide PNG. Status is polled every 2 s. It uses the same API base as devices. Cross-origin use needs `PIMATRIX_CORS_ORIGINS` on pimatrix listing the picontrol origin. Not run against a live pimatrix, Pi or ATEM; checked with a mock API in headless Chromium only.
+```
+                      ┌──────────────────────────────────────┐
+                      │    picontrol (Browser UI & CLI)      │
+                      └──────────────────┬───────────────────┘
+                                         │ HTTP REST & SSE
+                                         ▼
+                             ┌───────────────────────┐
+                             │       pigateway       │
+                             └───────────┬───────────┘
+               ┌─────────────┬───────────┼───────────┬─────────────┐
+               ▼             ▼           ▼           ▼             ▼
+          [ pitube ]   [ pilight ]  [ pivoice ] [ pimatrix ]  [ ATEM / Cam ]
+           YouTube       Tally       Audio &      Video &       Hardware
+          Broadcasts    Lights      Captions     Routing       Switching
+```
+
+---
+
+## 1. Browser UI (`ui/`)
+
+Responsive Material Design / Tailwind UI built for phones, tablets, and booth touchscreens.
+
+### Bottom Navigation Bar & Overflow (`...`)
+The bottom navigation bar presents primary tabs:
+- **Outputs**: Pi 1 (`hdmi 0`) & Pi 2 (`hdmi 1`) hardware outputs, crop/effects, and tactile switching.
+- **Video**: Double/single camera feeds, parameter matrix, PTZ directional controls, optical zoom, preset bank, and **operator tally cue buttons**.
+- **YouTube (`pitube`)**: Live broadcast selector, ad-hoc broadcast creation modal (`+ Uusi lähetys`), 16:9 confidence monitor iframe preview (`~30s delay`, muted for sound booth hygiene, with `[CC]` caption check), stream health, and **[ Aloita lähetys / Go Live ]** / **[ Lopeta lähetys / End ]** controls.
+- **Tally (`pilight`)**: 8-unit Tally-Ma wireless monitor strip, live PGM (Red) / PRV (Green) / OFF state toggles, talent `[ CALL ]` (flash 3x white), `[ HOLD ]`, `[ Brightness ]`, 9-LED cycle test, and **PTZ Camera Director Cues** (`Pan Left`, `Pan Right`, `Zoom In`, `Zoom Out`, `Cue Operator`).
+- **Voice (`pivoice`)**: Microphone capture status, voice activity detection, live transcription feed from the Auditor hub, and modes (Auditor, Radio, Relay, YouTube).
+- **More (`...`) Overflow Button**: Tapping `...` opens a bottom sheet with the remaining destinations:
+  - **Web Radio**: Icecast2 relay client status, transmission start/stop, and HTML5 audio confidence preview player.
+  - **Matrix Inputs**: Atlona 4x4 hardware video switcher routing and safety lock.
+  - **PiPGM Renderer**: Graphics & slide pipeline placeholder.
+  - **Multiview**: Direct link to the standalone multiview monitoring grid.
+
+### Running & Building the UI
+```sh
+npm run dev:ui     # Starts Vite development server at http://localhost:5173
+npm run build:ui   # Typechecks and builds production bundle in ui/dist
+```
+
+---
+
+## 2. picontrol CLI (`bin/picontrol.mjs`)
+
+Command-line interface to monitor and control the entire Pi stack via `pigateway`.
+
+### Global Options
+- `--gateway <url>`: Gateway URL (default `http://127.0.0.1:3100` or `PIGATEWAY_URL`)
+- `--youtube <url>`: pitube URL (default `http://127.0.0.1:3105` or `PITUBE_URL`)
+- `--tally <url>`: pilight URL (default `http://127.0.0.1:3200` or `PILIGHT_URL`)
+- `--api-key <key>`: Gateway API authorization token (`PIGATEWAY_API_KEY`)
+- `--json`: Output raw JSON for scripts and agents
+
+### Commands
+
+#### Overall Status
+```sh
+picontrol status
+picontrol --json status
+```
+
+#### YouTube & Broadcasts (pitube)
+```sh
+picontrol youtube status                                  # Ingest health, state, and caption counts
+picontrol youtube list                                    # List upcoming scheduled broadcasts
+picontrol youtube select <broadcastId|auto>               # Select active broadcast
+picontrol youtube create --title "Messu 1.11.2026"        # Create ad-hoc broadcast
+picontrol youtube start                                   # Transition broadcast to LIVE
+picontrol youtube stop                                    # Transition broadcast to COMPLETE
+```
+
+#### Tally Lights & Director Cues (pilight)
+```sh
+picontrol tally list                                      # List all lights and states
+picontrol tally set tally01 pgm                           # Set solid Program (Red)
+picontrol tally set 1 prv                                 # Set solid Preview (Green)
+picontrol tally cue 1 pan-left                            # Cue camera operator to pan left
+picontrol tally cue 1 zoom-in                             # Cue camera operator to zoom in
+picontrol tally cue 1 operator-call                       # Flash rear operator LEDs 1 & 9
+picontrol tally call tally01                              # Flash talent call (white 3x)
+picontrol tally hold tally01 1                            # Enable HOLDDATA
+picontrol tally brightness tally01 high                   # Set brightness (low/medium/high)
+picontrol tally cycle 1                                   # Run 9-LED cycle diagnostic test
+```
+
+#### Voice & Audio (pivoice)
+```sh
+picontrol voice status                                    # Voice detection & capture state
+picontrol voice capture start                             # Start ALSA audio capture
+picontrol voice capture stop                              # Stop audio capture
+```
+
+#### Web Radio Relay
+```sh
+picontrol radio status                                    # Relay lifecycle and listeners
+picontrol radio start                                     # Start streaming to web radio
+picontrol radio stop                                      # Stop web radio stream
+```
+
+#### ATEM Switcher & Hardware
+```sh
+picontrol atem status                                     # ATEM connection & preview/program inputs
+picontrol atem preview 2                                  # Set preview to input 2
+picontrol atem cut                                        # Trigger CUT transition
+picontrol atem auto                                       # Trigger AUTO transition
+picontrol atem ftb                                        # Fade to black
+```
+
+#### Atlona Video Matrix
+```sh
+picontrol matrix status                                   # Route mapping
+picontrol matrix route 1 2                                # Route input 1 to output 2
+```
+
+#### Cameras & PTZ
+```sh
+picontrol camera list                                     # List cameras & connection status
+picontrol camera move cam1 left                           # Move camera
+picontrol camera zoom cam1 in                             # Zoom camera
+picontrol camera preset cam1 3                            # Recall preset 3
+picontrol camera preset cam1 3 --save                     # Save current position to preset 3
+```
+
+---
+
+## 3. Testing & Building Everything
+
+```sh
+npm test         # Runs unit and integration test suite
+npm run build    # Compiles CLI TypeScript and UI bundle
+```
