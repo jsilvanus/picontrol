@@ -1,0 +1,19 @@
+function x(e){const c=e.size==="xs"?"w-1.5 h-1.5":e.size==="sm"?"w-2 h-2":e.size==="lg"?"w-3 h-3":"w-2.5 h-2.5";let a="bg-slate-400",t=!1;switch(e.status){case"online":case"good":a="bg-emerald-500";break;case"live":a="bg-red-500",t=!0;break;case"warning":case"poor":case"standby":a="bg-amber-500";break;case"error":a="bg-error";break;case"busy":a="bg-primary",t=!0;break;case"offline":case"noData":default:a="bg-outline/50";break}const i=e.pulse??t?"animate-pulse":"",o=e.id?` id="${e.id}"`:"",s=e.title?` title="${e.title}"`:"",l=e.className??"";return`<span${o}${s} class="inline-block rounded-full flex-shrink-0 ${c} ${a} ${i} ${l}"></span>`}function r(e){const c=e.size==="xs"?"px-1.5 py-0.5 text-[9px]":e.size==="md"?"px-3 py-1 text-[11px]":"px-2 py-0.5 text-[10px]";let a="bg-surface-container-high text-on-surface-variant border border-outline-variant/30";switch(e.variant){case"primary":a="bg-primary text-on-primary";break;case"secondary":a="bg-secondary-container text-on-secondary-container";break;case"success":a="bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30";break;case"warning":a="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30";break;case"error":a="bg-error text-on-error";break;case"crop":a="bg-secondary-container text-on-secondary-container";break;case"ftb":a="bg-error text-on-error animate-pulse";break;case"outline":a="bg-transparent text-on-surface border border-outline-variant/40";break;case"accent":a="bg-primary-fixed text-on-primary-fixed border border-primary/20";break;case"neutral":default:a="bg-surface-container-high text-on-surface-variant border border-outline-variant/30";break}const t=e.pulse?"animate-pulse":"",n=e.id?` id="${e.id}"`:"",i=e.title?` title="${e.title}"`:"",o=e.className??"";let s="";if(e.dot){const d=typeof e.dot=="string"?e.dot:"online";s=x({status:d,size:"xs",pulse:e.pulse})}const l=e.icon?`<span class="material-symbols-outlined text-[13px] leading-none">${e.icon}</span>`:"";return`<span${n}${i} class="inline-flex items-center gap-1 rounded-full font-label-sm font-bold uppercase tracking-wider ${c} ${a} ${t} ${o}">
+    ${s}
+    ${l}
+    <span>${e.label}</span>
+  </span>`}function g(e){var s,l,d,b,u;const c=typeof e.timestamp=="number"?new Date(e.timestamp).toLocaleTimeString("fi-FI"):e.timestamp??"",a=e.speaker?r({label:e.speaker,variant:"primary",size:"xs",icon:"person"}):"";let t="";((s=e.flags)==null?void 0:s.youtube)==="sent"?t=r({label:"YT: Sent",variant:"success",size:"xs",icon:"smart_display"}):((l=e.flags)==null?void 0:l.youtube)==="dropped"?t=r({label:"YT: Dropped",variant:"error",size:"xs",icon:"error"}):((d=e.flags)==null?void 0:d.youtube)==="pending"&&(t=r({label:"YT: In Flight",variant:"warning",size:"xs",pulse:!0}));let n="";((b=e.flags)==null?void 0:b.relay)==="sent"?n=r({label:"Relay: Sent",variant:"success",size:"xs",icon:"radio"}):((u=e.flags)==null?void 0:u.relay)==="dropped"&&(n=r({label:"Relay: Dropped",variant:"error",size:"xs",icon:"error"}));const i=e.lagMs!==void 0?`<span class="text-[9px] font-mono text-on-surface-variant/80">${e.lagMs}ms lag</span>`:"";return`<div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/30 flex flex-col gap-1.5 transition-all hover:bg-surface-container-high ${e.className??""}">
+    <div class="flex items-center justify-between gap-2 min-w-0">
+      <div class="flex items-center gap-1.5 flex-wrap min-w-0">
+        ${a}
+        ${e.language?r({label:e.language,variant:"outline",size:"xs"}):""}
+      </div>
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        ${t}
+        ${n}
+        <span class="text-[10px] font-mono text-on-surface-variant flex-shrink-0">${c}</span>
+      </div>
+    </div>
+    <p class="font-body-md text-[13px] text-on-surface leading-snug break-words">${e.text}</p>
+    ${i?`<div class="flex justify-end pt-0.5">${i}</div>`:""}
+  </div>`}export{g as a,x as b,r};

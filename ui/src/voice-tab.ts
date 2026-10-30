@@ -1,5 +1,6 @@
 // Voice tab: Audio pipeline flow page (Capture -> STT -> Captions -> Web Radio).
 // Talks to pivoice's /api/v1 with a Bearer token and pigateway /api/v1/transcripts & /api/v1/radio-relay.
+import { renderCaptionItem } from "./components/molecules/caption-item.js";
 
 type Mode = "on" | "off" | "auto";
 type CaptureMode = "on" | "off" | "auto" | "schedule";
@@ -174,15 +175,21 @@ function render(status: VoiceStatus | null, config: VoiceConfig | null, error: s
   const isCaptionsFlowing = processed > 0 && !status?.transcription.lastError;
 
   const transcriptRows = recentTranscripts.length > 0
-    ? recentTranscripts.map(t => `
-        <div class="p-2 rounded-lg bg-surface-container border border-outline-variant/30 text-[12px] font-body-sm flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            ${t.speaker ? `<span class="font-bold text-primary mr-1.5">[${escapeHtml(t.speaker)}]</span>` : ""}
-            <span class="text-on-surface">${escapeHtml(t.text)}</span>
-          </div>
-          <span class="text-[10px] font-mono text-on-surface-variant flex-shrink-0">${t.timestamp ? new Date(t.timestamp).toLocaleTimeString("fi-FI") : ""}</span>
-        </div>
-      `).join("")
+    ? recentTranscripts.map(t => {
+        const isYtActive = ytCaptionsMode !== "off";
+        const isRelayActive = relayCaptionsMode !== "off";
+        return renderCaptionItem({
+          text: t.text,
+          speaker: t.speaker,
+          timestamp: t.timestamp,
+          lagMs: lagMs ?? undefined,
+          language: "fi",
+          flags: {
+            youtube: isYtActive ? "sent" : "disabled",
+            relay: isRelayActive ? "sent" : "disabled"
+          }
+        });
+      }).join("")
     : `<div class="p-3 text-center text-[12px] text-on-surface-variant italic">Ei viimeaikaisia tekstitystapahtumia. Tekstitykset näkyvät tässä reaaliajassa puheen alkaessa.</div>`;
 
   root.innerHTML = `
