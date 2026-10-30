@@ -8,3 +8,4 @@ export * from "./toggle-switch.js";
 export * from "./stat-display.js";
 export * from "./meter.js";
 export * from "./text-input.js";
+export * from "./speaker-badge.js";
