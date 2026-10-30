@@ -210,9 +210,45 @@ export class GatewayClient {
     return this.request(this.gatewayUrl, "/api/v1/radio-relay/stop", "POST");
   }
 
-  // --- ATEM Switcher ---
+  // --- Video Mixer (ATEM Switcher / PiSwitch) ---
+  async getVideoMixerState(): Promise<Record<string, unknown>> {
+    return this.request(this.gatewayUrl, "/api/v1/video-mixer");
+  }
+
   async getAtemState(): Promise<Record<string, unknown>> {
-    return this.request(this.gatewayUrl, "/api/v1/atem");
+    return this.getVideoMixerState();
+  }
+
+  async videoMixerCut(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/video-mixer/cut", "POST");
+  }
+
+  async videoMixerAuto(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/video-mixer/auto", "POST");
+  }
+
+  async videoMixerPreview(input: number): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/video-mixer/preview", "POST", { input });
+  }
+
+  async videoMixerFtb(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/video-mixer/ftb", "POST");
+  }
+
+  async atemCut(): Promise<unknown> {
+    return this.videoMixerCut();
+  }
+
+  async atemAuto(): Promise<unknown> {
+    return this.videoMixerAuto();
+  }
+
+  async atemPreview(input: number): Promise<unknown> {
+    return this.videoMixerPreview(input);
+  }
+
+  async atemFtb(): Promise<unknown> {
+    return this.videoMixerFtb();
   }
 
   // --- Encoder (Matrox Monarch HDX) ---
@@ -232,21 +268,7 @@ export class GatewayClient {
     return this.request(this.gatewayUrl, "/api/v1/encoder/settings");
   }
 
-  async atemCut(): Promise<unknown> {
-    return this.request(this.gatewayUrl, "/api/v1/atem/cut", "POST");
-  }
 
-  async atemAuto(): Promise<unknown> {
-    return this.request(this.gatewayUrl, "/api/v1/atem/auto", "POST");
-  }
-
-  async atemPreview(input: number): Promise<unknown> {
-    return this.request(this.gatewayUrl, "/api/v1/atem/preview", "POST", { input });
-  }
-
-  async atemFtb(): Promise<unknown> {
-    return this.request(this.gatewayUrl, "/api/v1/atem/ftb", "POST");
-  }
 
   // --- Atlona Matrix ---
   async getMatrixRoutes(): Promise<Record<string, unknown>> {

@@ -1,6 +1,6 @@
 // YouTube & Video Stream Flow tab: live stream pipeline monitoring & control.
 // Pipeline: ATEM Switcher -> Hardware Encoder (Matrox Monarch HDX) -> YouTube Live -> Closed Captions.
-// Talks to pitube (/api/v1/youtube or :3105) and pigateway (/api/v1/atem and /api/v1/encoder).
+// Talks to pitube (/api/v1/youtube or :3105) and pigateway (/api/v1/video-mixer and /api/v1/encoder).
 
 export interface BroadcastSummary {
   id: string;
@@ -114,7 +114,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 async function fetchAtemAndEncoder(): Promise<void> {
   try {
-    const atemRes = await fetch("/api/v1/atem");
+    const atemRes = await fetch("/api/v1/video-mixer");
     if (atemRes.ok) {
       atemState = await atemRes.json() as AtemState;
     }
@@ -214,7 +214,7 @@ export async function controlEncoder(action: "start" | "stop", target: 1 | 2 | "
 
 export async function switchAtemCut(): Promise<void> {
   try {
-    await fetch("/api/v1/atem/cut", { method: "POST" });
+    await fetch("/api/v1/video-mixer/cut", { method: "POST" });
     showToast("ATEM CUT suoritettu");
     void fetchAtemAndEncoder().then(render);
   } catch (err: unknown) {
@@ -224,7 +224,7 @@ export async function switchAtemCut(): Promise<void> {
 
 export async function switchAtemAuto(): Promise<void> {
   try {
-    await fetch("/api/v1/atem/auto", { method: "POST" });
+    await fetch("/api/v1/video-mixer/auto", { method: "POST" });
     showToast("ATEM AUTO siirtymä suoritettu");
     void fetchAtemAndEncoder().then(render);
   } catch (err: unknown) {
@@ -234,7 +234,7 @@ export async function switchAtemAuto(): Promise<void> {
 
 export async function setAtemProgramInput(input: number): Promise<void> {
   try {
-    await fetch("/api/v1/atem/program", {
+    await fetch("/api/v1/video-mixer/program", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ input }),

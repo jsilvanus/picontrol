@@ -93,7 +93,7 @@ async function call(method: "GET" | "POST" | "PUT", path: string, body?: unknown
 }
 
 export function refreshAtem(): Promise<AtemState | null> {
-  return call("GET", "/api/v1/atem");
+  return call("GET", "/api/v1/video-mixer");
 }
 
 /** Polls while the ATEM view is on screen. */
@@ -113,16 +113,16 @@ export function setAtemActive(active: boolean): void {
 export function initAtemView(showToast: (message: string) => void): void {
   toast = showToast;
   window.atemSelectInput = async (input) => {
-    await call("PUT", "/api/v1/atem/preview", { input });
+    await call("PUT", "/api/v1/video-mixer/preview", { input });
   };
   window.atemCut = async () => {
-    await call("POST", "/api/v1/atem/cut");
+    await call("POST", "/api/v1/video-mixer/cut");
   };
   window.atemAuto = async () => {
-    await call("POST", "/api/v1/atem/auto");
+    await call("POST", "/api/v1/video-mixer/auto");
   };
   window.atemFtb = async () => {
-    await call("POST", "/api/v1/atem/ftb");
+    await call("POST", "/api/v1/video-mixer/ftb");
   };
   window.atemSelectDsk = (dsk) => {
     selectedDsk = dsk;
@@ -130,11 +130,11 @@ export function initAtemView(showToast: (message: string) => void): void {
   };
   window.atemToggleTie = async () => {
     const current = state?.downstreamKeyers.find((k) => k.dsk === selectedDsk);
-    await call("PUT", `/api/v1/atem/dsk/${selectedDsk}/tie`, { tie: !(current?.tie ?? false) });
+    await call("PUT", `/api/v1/video-mixer/dsk/${selectedDsk}/tie`, { tie: !(current?.tie ?? false) });
   };
   window.atemToggleOnAir = async () => {
     const current = state?.downstreamKeyers.find((k) => k.dsk === selectedDsk);
-    await call("PUT", `/api/v1/atem/dsk/${selectedDsk}/on-air`, { onAir: !(current?.onAir ?? false) });
+    await call("PUT", `/api/v1/video-mixer/dsk/${selectedDsk}/on-air`, { onAir: !(current?.onAir ?? false) });
   };
   renderAtem();
 }
