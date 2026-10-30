@@ -9,3 +9,6 @@ export * from "./stat-display.js";
 export * from "./meter.js";
 export * from "./text-input.js";
 export * from "./speaker-badge.js";
+export * from "./agent-status-badge.js";
+export * from "./agent-priority-pill.js";
+export * from "./model-badge.js";
