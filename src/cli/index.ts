@@ -20,11 +20,23 @@ COMMANDS:
   encoder <action> [...]     Control Matrox Monarch HDX encoder (status, start, stop, settings)
   matrix <action> [...]      Control Atlona video matrix (status, route)
   camera <action> [...]      Control PTZ cameras & presets (list, move, zoom, preset)
+  rundown <action> [...]     Control PiRundown (status, next, prev, reset, fire, cues, storage)
+  graphics <action> [...]    Control PiGraphics (status, templates, active, show, hide, clear)
+  program <action> [...]     Control PiProgram presentation (status, pipelines, advance, hymn)
+  space <action> [...]       Query PiSpace 3D venue & spatial solver (status, venue, solve)
+  perception [status|tracks] Query PiPerception neural tracker
+  world                      Query fused World State (VAD + 3D spatial + speaker)
+  transcripts                Query latest speech transcripts from Auditor
 
 GLOBAL OPTIONS:
   --gateway <url>            pigateway base URL (default: http://127.0.0.1:3100 or PIGATEWAY_URL)
   --youtube <url>            pitube base URL (default: http://127.0.0.1:3105)
   --tally <url>              pilight base URL (default: http://127.0.0.1:3200)
+  --rundown <url>            pirundown base URL (default: http://127.0.0.1:3400)
+  --graphics <url>           pigraphics base URL (default: http://127.0.0.1:3107)
+  --program <url>            piprogram base URL (default: http://127.0.0.1:3104)
+  --space <url>              pispace base URL (default: http://127.0.0.1:3108)
+  --perception <url>         piperception base URL (default: http://127.0.0.1:3110)
   --api-key <key>            API key / Bearer token (default: PIGATEWAY_API_KEY)
   --json                     Output raw JSON
   -h, --help                 Show this help message
@@ -46,6 +58,11 @@ async function main(): Promise<void> {
     voiceUrl: process.env.PIVOICE_URL || "http://127.0.0.1:3101",
     apiKey: process.env.PIGATEWAY_API_KEY,
     soundUrl: process.env.PISOUND_URL || "http://127.0.0.1:3300",
+    rundownUrl: process.env.PIRUNDOWN_URL || "http://127.0.0.1:3400",
+    graphicsUrl: process.env.PIGRAPHICS_URL || "http://127.0.0.1:3107",
+    programUrl: process.env.PIPROGRAM_URL || "http://127.0.0.1:3104",
+    spaceUrl: process.env.PISPACE_URL || "http://127.0.0.1:3108",
+    perceptionUrl: process.env.PIPERCEPTION_URL || "http://127.0.0.1:3110",
     json: false,
   };
 
@@ -62,6 +79,16 @@ async function main(): Promise<void> {
       config.voiceUrl = args[++i]!;
     } else if (arg === "--sound" && i + 1 < args.length) {
       config.soundUrl = args[++i]!;
+    } else if (arg === "--rundown" && i + 1 < args.length) {
+      config.rundownUrl = args[++i]!;
+    } else if (arg === "--graphics" && i + 1 < args.length) {
+      config.graphicsUrl = args[++i]!;
+    } else if (arg === "--program" && i + 1 < args.length) {
+      config.programUrl = args[++i]!;
+    } else if (arg === "--space" && i + 1 < args.length) {
+      config.spaceUrl = args[++i]!;
+    } else if (arg === "--perception" && i + 1 < args.length) {
+      config.perceptionUrl = args[++i]!;
     } else if (arg === "--api-key" && i + 1 < args.length) {
       config.apiKey = args[++i]!;
     } else if (arg === "--json") {
@@ -396,6 +423,133 @@ async function main(): Promise<void> {
         } else {
           throw new Error(`Unknown camera action: ${sub}`);
         }
+        break;
+      }
+
+      case "rundown": {
+        if (!sub || sub === "status") {
+          const res = await client.getRundown();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "next") {
+          const res = await client.nextRundown();
+          console.log(config.json ? JSON.stringify(res, null, 2) : "Advanced to next item");
+        } else if (sub === "prev" || sub === "previous") {
+          const res = await client.prevRundown();
+          console.log(config.json ? JSON.stringify(res, null, 2) : "Moved to previous item");
+        } else if (sub === "reset") {
+          const res = await client.resetRundown();
+          console.log(config.json ? JSON.stringify(res, null, 2) : "Reset rundown to beginning");
+        } else if (sub === "fire") {
+          const target = rest[0];
+          if (!target) throw new Error("Usage: picontrol rundown fire <lineNum|itemId>");
+          const res = await client.fireRundown(target);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Fired cue ${target}`);
+        } else if (sub === "cues") {
+          const state = rest[0] as "on" | "off" | "toggle" | undefined;
+          const res = await client.toggleCues(state);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Cue engine: ${state || "toggle"}`);
+        } else if (sub === "storage") {
+          const [action, id] = rest;
+          if (action === "load" && id) {
+            const res = await client.loadRundownStorage(id);
+            console.log(config.json ? JSON.stringify(res, null, 2) : `Loaded rundown: ${id}`);
+          } else {
+            const res = await client.listRundownStorage();
+            console.log(config.json ? JSON.stringify(res, null, 2) : res);
+          }
+        } else {
+          throw new Error(`Unknown rundown action: ${sub}`);
+        }
+        break;
+      }
+
+      case "graphics": {
+        if (!sub || sub === "status") {
+          const res = await client.getGraphicsStatus();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "templates") {
+          const res = await client.listGraphicsTemplates();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "active") {
+          const res = await client.getActiveGraphics();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "show") {
+          const templateId = rest[0];
+          if (!templateId) throw new Error("Usage: picontrol graphics show <templateId> [durationMs]");
+          const duration = rest[1] ? Number.parseInt(rest[1], 10) : undefined;
+          const res = await client.showGraphic(templateId, undefined, duration);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Triggered graphic: ${templateId}`);
+        } else if (sub === "hide") {
+          const instId = rest[0];
+          if (!instId) throw new Error("Usage: picontrol graphics hide <instanceId>");
+          const res = await client.hideGraphic(instId);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Hidden graphic: ${instId}`);
+        } else if (sub === "clear") {
+          const res = await client.clearGraphics();
+          console.log(config.json ? JSON.stringify(res, null, 2) : "Cleared all graphics off-air");
+        } else {
+          throw new Error(`Unknown graphics action: ${sub}`);
+        }
+        break;
+      }
+
+      case "program": {
+        if (!sub || sub === "status") {
+          const res = await client.getProgramStatus();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "pipelines") {
+          const res = await client.listPipelines();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "advance" || sub === "next") {
+          const pipeId = rest[0] || "default";
+          const res = await client.advanceProgramSlide(pipeId);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Advanced pipeline: ${pipeId}`);
+        } else if (sub === "hymn") {
+          const hymn = rest[0];
+          if (!hymn) throw new Error("Usage: picontrol program hymn <number>");
+          const res = await client.triggerHymn(hymn);
+          console.log(config.json ? JSON.stringify(res, null, 2) : `Selected hymn: ${hymn}`);
+        } else {
+          throw new Error(`Unknown program action: ${sub}`);
+        }
+        break;
+      }
+
+      case "space": {
+        if (!sub || sub === "status" || sub === "venue") {
+          const res = await client.getVenue();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "state") {
+          const res = await client.getSpatialState();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else {
+          throw new Error(`Unknown space action: ${sub}`);
+        }
+        break;
+      }
+
+      case "perception": {
+        if (!sub || sub === "status") {
+          const res = await client.getPerceptionStatus();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "tracks") {
+          const res = await client.getPerceptionTracks();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else {
+          throw new Error(`Unknown perception action: ${sub}`);
+        }
+        break;
+      }
+
+      case "world": {
+        const res = await client.getWorldState();
+        console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        break;
+      }
+
+      case "transcripts": {
+        const res = await client.getTranscripts();
+        console.log(config.json ? JSON.stringify(res, null, 2) : res);
         break;
       }
 

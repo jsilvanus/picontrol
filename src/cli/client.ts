@@ -31,6 +31,11 @@ export interface CliConfig {
   tallyUrl?: string;
   voiceUrl?: string;
   soundUrl?: string;
+  rundownUrl?: string;
+  graphicsUrl?: string;
+  programUrl?: string;
+  spaceUrl?: string;
+  perceptionUrl?: string;
   apiKey?: string;
   json?: boolean;
 }
@@ -41,6 +46,11 @@ export class GatewayClient {
   readonly tallyUrl: string;
   readonly voiceUrl: string;
   readonly soundUrl: string;
+  readonly rundownUrl: string;
+  readonly graphicsUrl: string;
+  readonly programUrl: string;
+  readonly spaceUrl: string;
+  readonly perceptionUrl: string;
   readonly apiKey?: string;
   readonly json: boolean;
 
@@ -50,6 +60,11 @@ export class GatewayClient {
     this.tallyUrl = (config.tallyUrl || "http://127.0.0.1:3200").replace(/\/+$/, "");
     this.voiceUrl = (config.voiceUrl || "http://127.0.0.1:3101").replace(/\/+$/, "");
     this.soundUrl = (config.soundUrl || "http://127.0.0.1:3300").replace(/\/+$/, "");
+    this.rundownUrl = (config.rundownUrl || "http://127.0.0.1:3400").replace(/\/+$/, "");
+    this.graphicsUrl = (config.graphicsUrl || "http://127.0.0.1:3107").replace(/\/+$/, "");
+    this.programUrl = (config.programUrl || "http://127.0.0.1:3104").replace(/\/+$/, "");
+    this.spaceUrl = (config.spaceUrl || "http://127.0.0.1:3108").replace(/\/+$/, "");
+    this.perceptionUrl = (config.perceptionUrl || "http://127.0.0.1:3110").replace(/\/+$/, "");
     this.apiKey = config.apiKey || process.env.PIGATEWAY_API_KEY;
     this.json = Boolean(config.json);
   }
@@ -298,5 +313,136 @@ export class GatewayClient {
 
   async savePreset(camId: string, presetId: number): Promise<unknown> {
     return this.request(this.gatewayUrl, `/api/v1/cameras/${encodeURIComponent(camId)}/presets/${presetId}/save`, "POST");
+  }
+
+  // --- PiRundown (cues, rundown flow, storage) ---
+  async getRundown(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.rundownUrl, "/api/v1/status");
+    } catch {
+      return await this.request(this.gatewayUrl, "/api/v1/rundown");
+    }
+  }
+
+  async nextRundown(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/rundown/next", "POST");
+  }
+
+  async prevRundown(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/rundown/previous", "POST");
+  }
+
+  async resetRundown(): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/rundown/reset", "POST");
+  }
+
+  async fireRundown(target: string | number): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/rundown/fire", "POST", { target });
+  }
+
+  async toggleCues(state?: "on" | "off" | "toggle"): Promise<unknown> {
+    const endpoint = state === "on" ? "/api/v1/cues/enable" : state === "off" ? "/api/v1/cues/disable" : "/api/v1/cues/toggle";
+    return this.request(this.rundownUrl, endpoint, "POST");
+  }
+
+  async listRundownStorage(): Promise<unknown[]> {
+    try {
+      return await this.request(this.rundownUrl, "/api/v1/storage");
+    } catch {
+      return await this.request(this.gatewayUrl, "/api/v1/rundown/storage");
+    }
+  }
+
+  async loadRundownStorage(id: string): Promise<unknown> {
+    try {
+      return await this.request(this.rundownUrl, `/api/v1/storage/${encodeURIComponent(id)}/load`, "POST");
+    } catch {
+      return await this.request(this.gatewayUrl, `/api/v1/rundown/storage/${encodeURIComponent(id)}/load`, "POST");
+    }
+  }
+
+  // --- PiGraphics (templates, active graphics overlay) ---
+  async getGraphicsStatus(): Promise<Record<string, unknown>> {
+    return this.request(this.graphicsUrl, "/api/v1/status");
+  }
+
+  async listGraphicsTemplates(): Promise<unknown[]> {
+    return this.request(this.graphicsUrl, "/api/v1/graphics/templates");
+  }
+
+  async getActiveGraphics(): Promise<unknown[]> {
+    return this.request(this.graphicsUrl, "/api/v1/graphics/active");
+  }
+
+  async showGraphic(templateId: string, data?: Record<string, unknown>, durationMs?: number): Promise<unknown> {
+    return this.request(this.graphicsUrl, "/api/v1/graphics/active/show", "POST", { templateId, data, durationMs });
+  }
+
+  async hideGraphic(instanceId: string): Promise<unknown> {
+    return this.request(this.graphicsUrl, `/api/v1/graphics/active/hide/${encodeURIComponent(instanceId)}`, "POST");
+  }
+
+  async clearGraphics(): Promise<unknown> {
+    return this.request(this.graphicsUrl, "/api/v1/graphics/active/clear", "POST");
+  }
+
+  // --- PiProgram (presentation, slides, stage pipeline) ---
+  async getProgramStatus(): Promise<Record<string, unknown>> {
+    return this.request(this.programUrl, "/ready");
+  }
+
+  async listPipelines(): Promise<unknown[]> {
+    return this.request(this.programUrl, "/api/v1/pipgm/pipelines");
+  }
+
+  async getPipeline(id: string): Promise<Record<string, unknown>> {
+    return this.request(this.programUrl, `/api/v1/pipgm/pipelines/${encodeURIComponent(id)}`);
+  }
+
+  async advanceProgramSlide(pipelineId = "default"): Promise<unknown> {
+    return this.request(this.programUrl, `/api/v1/pipgm/pipelines/${encodeURIComponent(pipelineId)}/control`, "POST", { action: "next" });
+  }
+
+  async triggerHymn(hymn: string): Promise<unknown> {
+    return this.request(this.gatewayUrl, "/api/v1/actions/execute", "POST", { action: "pipgm:hymn", params: { hymn } });
+  }
+
+  // --- PiSpace (3D venue, spatial solver, tracking) ---
+  async getVenue(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.spaceUrl, "/api/v1/venue");
+    } catch {
+      return await this.request(this.gatewayUrl, "/api/v1/venue");
+    }
+  }
+
+  async getSpatialState(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.spaceUrl, "/api/v1/spatial");
+    } catch {
+      return await this.request(this.gatewayUrl, "/api/v1/spatial");
+    }
+  }
+
+  async solvePtz(target: { x: number; y: number; z: number }, cameraId: string): Promise<unknown> {
+    return this.request(this.spaceUrl, "/api/v1/spatial/solve-ptz", "POST", { target, cameraId });
+  }
+
+  // --- PiPerception (person detection, target tracks) ---
+  async getPerceptionStatus(): Promise<Record<string, unknown>> {
+    return this.request(this.perceptionUrl, "/health");
+  }
+
+  async getPerceptionTracks(): Promise<unknown[]> {
+    return this.request(this.perceptionUrl, "/api/v1/perception/tracks");
+  }
+
+  // --- World State & Transcripts (Auditor / Gateway) ---
+  async getWorldState(): Promise<Record<string, unknown>> {
+    return this.request(this.gatewayUrl, "/api/v1/world-state");
+  }
+
+  async getTranscripts(): Promise<unknown[]> {
+    return this.request(this.gatewayUrl, "/api/v1/transcripts");
   }
 }

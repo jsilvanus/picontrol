@@ -1,6 +1,6 @@
 // Voice tab: Audio pipeline flow page (Capture -> STT -> Captions -> Web Radio).
 // Talks to pivoice's /api/v1 with a Bearer token and pigateway /api/v1/transcripts & /api/v1/radio-relay.
-import { renderCaptionItem } from "./components/molecules/caption-item.js";
+import { renderCaptionItem } from "@piecosystem/piui";
 
 type Mode = "on" | "off" | "auto";
 type CaptureMode = "on" | "off" | "auto" | "schedule";
