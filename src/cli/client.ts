@@ -164,8 +164,21 @@ export class GatewayClient {
     return this.request(this.youtubeUrl, "/api/v1/broadcasts/start", "POST");
   }
 
+  /**
+   * Ends the broadcast in two steps: pitube hands out a short-lived confirmToken
+   * (POST /broadcasts/stop/request) that the stop call must carry. An older pitube
+   * without the request route is stopped the old way.
+   */
   async stopBroadcast(): Promise<unknown> {
-    return this.request(this.youtubeUrl, "/api/v1/broadcasts/stop", "POST");
+    let confirmToken: string | undefined;
+    try {
+      const req = await this.request<{ confirmToken?: string }>(this.youtubeUrl, "/api/v1/broadcasts/stop/request", "POST");
+      confirmToken = req.confirmToken;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/Not Found|404/.test(msg)) throw err;
+    }
+    return this.request(this.youtubeUrl, "/api/v1/broadcasts/stop", "POST", confirmToken ? { confirmToken } : undefined);
   }
 
   // --- Tally / pilight ---

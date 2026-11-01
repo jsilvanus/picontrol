@@ -789,7 +789,15 @@ export async function submitAdHocBroadcast(title: string, privacy: string, descr
 export async function executeStopBroadcast(): Promise<void> {
   if (!confirm("Haluatko varmasti lopettaa suoran lähetyksen? Lähetystä ei voi avata uudelleen.")) return;
   try {
-    await request("POST", "/broadcasts/stop");
+    // Two steps: pitube hands out a short-lived confirmToken; an older pitube without the route is stopped the old way.
+    let confirmToken: string | undefined;
+    try {
+      confirmToken = (await request<{ confirmToken?: string }>("POST", "/broadcasts/stop/request")).confirmToken;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/Not Found|404/.test(msg)) throw err;
+    }
+    await request("POST", "/broadcasts/stop", confirmToken ? { confirmToken } : undefined);
     showToast("Suora lähetys päättynyt.");
     void fetchYoutubeData();
   } catch (err: unknown) {
