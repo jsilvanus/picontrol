@@ -938,7 +938,8 @@ function renderSetupPage(selectedLight: TallyLight | undefined): string {
                             <option value="atlona-input-4" ${currentFacetValue === "atlona-input-4" ? "selected" : ""}>Atlona Tulo 4: Pi 2 (PiPGM 2)</option>
                             <option value="atlona-output-1" ${currentFacetValue === "atlona-output-1" ? "selected" : ""}>Atlona Lähtö 1: Videotykki 1 (Vasen / Vertical Left)</option>
                             <option value="atlona-output-2" ${currentFacetValue === "atlona-output-2" ? "selected" : ""}>Atlona Lähtö 2: Videotykki 2 (Oikea / Vertical Right)</option>
-                            <option value="atlona-output-5" ${currentFacetValue === "atlona-output-5" ? "selected" : ""}>Atlona Lähtö 5: Videomikseri (Roland / ATEM)</option>
+                            <option value="atlona-output-4" ${currentFacetValue === "atlona-output-4" ? "selected" : ""}>Atlona Lähtö 4: Videomikseri (Roland / ATEM)</option>
+                            <option value="atlona-output-5" ${currentFacetValue === "atlona-output-5" ? "selected" : ""}>Atlona Lähtö 5: Peilaa lähtöä 4 (vanha videomikseri)</option>
                           </optgroup>
                           <optgroup label="ATEM Kameratulot">
                             <option value="atem-input-1" ${currentFacetValue === "atem-input-1" ? "selected" : ""}>ATEM Tulo 1 (Cam 1 Center)</option>
