@@ -126,6 +126,8 @@ Transitions the selected broadcast from `ready` / `testing` to **`live`**.
 * **Response (200 OK):** Updated `BroadcastSummary` with `status: "live"`.
 
 #### 6. `POST /api/v1/broadcasts/stop`
+
+Two steps: `POST /api/v1/broadcasts/stop/request` returns `{ confirmToken }` (valid about 60 s, bound to the selected broadcast). `stop` then needs `{ "confirmToken": "..." }` when pitube runs with `PITUBE_REQUIRE_STOP_CONFIRM=1`. picontrol always does both calls.
 Transitions the broadcast from `live` to **`complete`**.
 * Halts live caption delivery.
 * Releases the broadcast and resets state to `idle`.
