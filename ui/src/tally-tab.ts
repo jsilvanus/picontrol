@@ -1,5 +1,5 @@
 // Tally tab & camera director PTZ cues (pilight integration for Tally-Ma wireless tally lights).
-// Talks to pilight (port 3200 or via gateway /api/v1/lights).
+// Talks to pilight (port 3107 or via gateway /api/v1/lights).
 
 export type FacetType =
   | "youtube-stream"

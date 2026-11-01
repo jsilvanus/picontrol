@@ -55,16 +55,16 @@ export class GatewayClient {
   readonly json: boolean;
 
   constructor(config: CliConfig) {
-    this.gatewayUrl = (config.gatewayUrl || "http://127.0.0.1:3100").replace(/\/+$/, "");
-    this.youtubeUrl = (config.youtubeUrl || "http://127.0.0.1:3105").replace(/\/+$/, "");
-    this.tallyUrl = (config.tallyUrl || "http://127.0.0.1:3200").replace(/\/+$/, "");
-    this.voiceUrl = (config.voiceUrl || "http://127.0.0.1:3101").replace(/\/+$/, "");
-    this.soundUrl = (config.soundUrl || "http://127.0.0.1:3300").replace(/\/+$/, "");
+    this.gatewayUrl = (config.gatewayUrl || "http://127.0.0.1:3000").replace(/\/+$/, "");
+    this.youtubeUrl = (config.youtubeUrl || "http://127.0.0.1:3500").replace(/\/+$/, "");
+    this.tallyUrl = (config.tallyUrl || "http://127.0.0.1:3107").replace(/\/+$/, "");
+    this.voiceUrl = (config.voiceUrl || "http://127.0.0.1:3106").replace(/\/+$/, "");
+    this.soundUrl = (config.soundUrl || "http://127.0.0.1:3105").replace(/\/+$/, "");
     this.rundownUrl = (config.rundownUrl || "http://127.0.0.1:3400").replace(/\/+$/, "");
-    this.graphicsUrl = (config.graphicsUrl || "http://127.0.0.1:3107").replace(/\/+$/, "");
-    this.programUrl = (config.programUrl || "http://127.0.0.1:3104").replace(/\/+$/, "");
-    this.spaceUrl = (config.spaceUrl || "http://127.0.0.1:3108").replace(/\/+$/, "");
-    this.perceptionUrl = (config.perceptionUrl || "http://127.0.0.1:3110").replace(/\/+$/, "");
+    this.graphicsUrl = (config.graphicsUrl || "http://127.0.0.1:3201").replace(/\/+$/, "");
+    this.programUrl = (config.programUrl || "http://127.0.0.1:3200").replace(/\/+$/, "");
+    this.spaceUrl = (config.spaceUrl || "http://127.0.0.1:3203").replace(/\/+$/, "");
+    this.perceptionUrl = (config.perceptionUrl || "http://127.0.0.1:3202").replace(/\/+$/, "");
     this.apiKey = config.apiKey || process.env.PIGATEWAY_API_KEY;
     this.json = Boolean(config.json);
   }

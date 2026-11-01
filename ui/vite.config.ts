@@ -16,9 +16,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://127.0.0.1:3100",
-      "/multiview": "http://127.0.0.1:3100",
-      "/pipgm": "http://127.0.0.1:3100"
+      "/api": "http://127.0.0.1:3000",
+      "/multiview": "http://127.0.0.1:3000",
+      "/pipgm": "http://127.0.0.1:3000"
     }
   }
 });

@@ -1,6 +1,6 @@
 // YouTube & Video Stream Flow tab: live stream pipeline monitoring & control.
 // Pipeline: ATEM Switcher -> Hardware Encoder (Matrox Monarch HDX) -> YouTube Live -> Closed Captions.
-// Talks to pitube (/api/v1/youtube or :3105) and pigateway (/api/v1/video-mixer and /api/v1/encoder).
+// Talks to pitube (/api/v1/youtube or :3500) and pigateway (/api/v1/video-mixer and /api/v1/encoder).
 
 export interface BroadcastSummary {
   id: string;

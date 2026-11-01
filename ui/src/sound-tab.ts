@@ -115,9 +115,9 @@ export function resolveSoundBase(search: string = window.location.search): strin
   const fromEnv = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_PISOUND_API_URL;
   if (fromQuery) return fromQuery.replace(/\/+$/, "");
   if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  // Default to pisound port 3300 on current host
+  // Default to pisound port 3105 on current host
   const host = typeof window !== "undefined" && window.location ? window.location.hostname : "127.0.0.1";
-  return `http://${host}:3300`;
+  return `http://${host}:3105`;
 }
 
 function escapeHtml(val: unknown): string {

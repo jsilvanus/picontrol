@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 // Base URL of the gateway / pimatrix server. Resolution order:
-//   1. ?gateway=<url> or ?api=<url> query parameter (e.g. multiview.html?gateway=http://192.168.1.10:3100)
+//   1. ?gateway=<url> or ?api=<url> query parameter (e.g. multiview.html?gateway=http://192.168.1.10:3000)
 //   2. VITE_GATEWAY_URL / VITE_PIGATEWAY_URL / VITE_PIMATRIX_URL at build time
 //   3. "" (same origin: all calls are relative, e.g. /api/v1/events)
 // The result never ends with a slash, so callers append "/api/v1/...".

@@ -33,7 +33,7 @@ This document outlines the production deployment architecture for `picontrol` an
  │           ▼                   ▼                  ▼                  ▼       │
  │    ┌─────────────┐     ┌─────────────┐    ┌─────────────┐    ┌────────────┐ │
  │    │ Static Files│     │  pigateway  │    │picontrol-mcp│    │  picanva   │ │
- │    │  (HTML/JS)  │     │  Port 3100  │    │  Port 3200  │    │ Port 3103  │ │
+ │    │  (HTML/JS)  │     │  Port 3000  │    │  Port 3600  │    │ Port 3103  │ │
  │    └─────────────┘     └─────────────┘    └─────────────┘    └────────────┘ │
  └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -87,7 +87,7 @@ This allows the same static build to be served at `http://keskuskirkko.fi` and s
 ### Serving the Web App Directly from Gateway or a Subpath
 1. **When Gateway serves the static files directly (All-in-One)**:
    - If `pigateway` (Fastify) is configured to host the static UI bundle directly via `@fastify/static`, Nginx does not need a local static `root` directive.
-   - Nginx simply proxies all traffic (`location /`) to `http://127.0.0.1:3100`.
+   - Nginx simply proxies all traffic (`location /`) to `http://127.0.0.1:3000`.
    - The UI automatically resolves all `/api/...` calls to the same origin without extra configuration.
 2. **When the Web App is served on a subpath (e.g. `/control/`)**:
    - `ui/vite.config.ts` uses `base: "./"`, which generates relative asset paths (`./assets/...`). This guarantees the UI functions correctly regardless of whether it is served from the root `/` or any subpath like `/control/`.
@@ -111,11 +111,11 @@ Nginx directs incoming requests based on path and port:
 |---|---|---|---|
 | `/` | `root /var/www/picontrol/ui/dist` | Static File | Single-Page Application (`try_files $uri $uri/ /index.html`) |
 | `/assets/` | `root /var/www/picontrol/ui/dist/assets` | Static File | Immutable 1-year browser caching for hashed bundles |
-| `/api/` | `http://127.0.0.1:3100` | HTTP/REST | Routes all control commands to `pigateway` |
-| `/api/v1/events` | `http://127.0.0.1:3100` | SSE Stream | **Buffering off** (`proxy_buffering off`), persistent keepalive, 24h timeout |
-| `/multiview` | `http://127.0.0.1:3100` | HTTP | Gateway multiview telemetry endpoint |
-| `/pipgm` | `http://127.0.0.1:3100` | HTTP | Gateway PGM rendering endpoint |
-| `/mcp` | `http://127.0.0.1:3200` | HTTP / SSE | Routes MCP tool calls & resources to `picontrol-mcp`, forwards `Authorization: Bearer` |
+| `/api/` | `http://127.0.0.1:3000` | HTTP/REST | Routes all control commands to `pigateway` |
+| `/api/v1/events` | `http://127.0.0.1:3000` | SSE Stream | **Buffering off** (`proxy_buffering off`), persistent keepalive, 24h timeout |
+| `/multiview` | `http://127.0.0.1:3000` | HTTP | Gateway multiview telemetry endpoint |
+| `/pipgm` | `http://127.0.0.1:3000` | HTTP | Gateway PGM rendering endpoint |
+| `/mcp` | `http://127.0.0.1:3600` | HTTP / SSE | Routes MCP tool calls & resources to `picontrol-mcp`, forwards `Authorization: Bearer` |
 | `/canva/` (or `:8443`) | `http://127.0.0.1:3103` | HTTP / HTTPS | Reverse proxy for `picanva` slide builder application |
 
 ### Ready-to-Use Nginx Configuration File
@@ -152,8 +152,8 @@ This ensures zero latency on status indicators and avoids socket drops during qu
 ## 6. Service Management (Systemd)
 
 All backend daemons run as systemd user or system services:
-- `pigateway.service` (Port 3100)
-- `picontrol-mcp.service` (Port 3200)
+- `pigateway.service` (Port 3000)
+- `picontrol-mcp.service` (Port 3600)
 - `picanva.service` (Port 3103, if running dynamically or served via static proxy)
 - `nginx.service` (Ports 80 / 443 / 8443)
 
