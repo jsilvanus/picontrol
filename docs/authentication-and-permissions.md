@@ -165,7 +165,7 @@ The `picontrol` interface dynamically adjusts controls to match the logged-in us
      - `👁️ Guest (Viewer)`
    - Tapping the badge opens user profile details, effective rights summary, and **Log Out**.
 3. **Instant User Invalidation:**
-   - If an admin revokes a user's rights or disables their account via CLI (`npm run user -- update <user> --disable`), existing tokens are immediately rejected by the backend with `401 Unauthorized`, and the UI returns to the login screen.
+   - If an admin revokes a user's rights or disables their account via CLI (`pnpm run user update <user> --disable`), existing tokens are immediately rejected by the backend with `401 Unauthorized`, and the UI returns to the login screen.
 
 ---
 
@@ -175,17 +175,17 @@ User accounts and rights can be managed via the CLI on the Pi:
 
 ```bash
 # Add a new user with password prompt
-npm run user -- add matti --role operator
+pnpm run user add matti --role operator
 
 # Restrict user from touching ATEM or YouTube broadcasts
-npm run user -- update matti --deny atem:write --deny youtube:write
+pnpm run user update matti --deny atem:write --deny youtube:write
 
 # Grant admin rights on audio/voice to a sound technician
-npm run user -- update soundtech --grant voice:admin
+pnpm run user update soundtech --grant voice:admin
 
 # List all configured users and their effective rights
-npm run user -- list
+pnpm run user list
 
 # Disable a user account immediately
-npm run user -- update matti --disable
+pnpm run user update matti --disable
 ```

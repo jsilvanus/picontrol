@@ -29,14 +29,14 @@ COMMANDS:
   transcripts                Query latest speech transcripts from Auditor
 
 GLOBAL OPTIONS:
-  --gateway <url>            pigateway base URL (default: http://127.0.0.1:3100 or PIGATEWAY_URL)
-  --youtube <url>            pitube base URL (default: http://127.0.0.1:3105)
-  --tally <url>              pilight base URL (default: http://127.0.0.1:3200)
+  --gateway <url>            pigateway base URL (default: http://127.0.0.1:3000 or PIGATEWAY_URL)
+  --youtube <url>            pitube base URL (default: http://127.0.0.1:3500)
+  --tally <url>              pilight base URL (default: http://127.0.0.1:3107)
   --rundown <url>            pirundown base URL (default: http://127.0.0.1:3400)
-  --graphics <url>           pigraphics base URL (default: http://127.0.0.1:3107)
-  --program <url>            piprogram base URL (default: http://127.0.0.1:3104)
-  --space <url>              pispace base URL (default: http://127.0.0.1:3108)
-  --perception <url>         piperception base URL (default: http://127.0.0.1:3110)
+  --graphics <url>           pigraphics base URL (default: http://127.0.0.1:3201)
+  --program <url>            piprogram base URL (default: http://127.0.0.1:3200)
+  --space <url>              pispace base URL (default: http://127.0.0.1:3203)
+  --perception <url>         piperception base URL (default: http://127.0.0.1:3202)
   --api-key <key>            API key / Bearer token (default: PIGATEWAY_API_KEY)
   --json                     Output raw JSON
   -h, --help                 Show this help message
@@ -52,17 +52,17 @@ async function main(): Promise<void> {
 
   // Parse global flags
   const config: CliConfig = {
-    gatewayUrl: process.env.PIGATEWAY_URL || "http://127.0.0.1:3100",
-    youtubeUrl: process.env.PITUBE_URL || "http://127.0.0.1:3105",
-    tallyUrl: process.env.PILIGHT_URL || "http://127.0.0.1:3200",
-    voiceUrl: process.env.PIVOICE_URL || "http://127.0.0.1:3101",
+    gatewayUrl: process.env.PIGATEWAY_URL || "http://127.0.0.1:3000",
+    youtubeUrl: process.env.PITUBE_URL || "http://127.0.0.1:3500",
+    tallyUrl: process.env.PILIGHT_URL || "http://127.0.0.1:3107",
+    voiceUrl: process.env.PIVOICE_URL || "http://127.0.0.1:3106",
     apiKey: process.env.PIGATEWAY_API_KEY,
-    soundUrl: process.env.PISOUND_URL || "http://127.0.0.1:3300",
+    soundUrl: process.env.PISOUND_URL || "http://127.0.0.1:3105",
     rundownUrl: process.env.PIRUNDOWN_URL || "http://127.0.0.1:3400",
-    graphicsUrl: process.env.PIGRAPHICS_URL || "http://127.0.0.1:3107",
-    programUrl: process.env.PIPROGRAM_URL || "http://127.0.0.1:3104",
-    spaceUrl: process.env.PISPACE_URL || "http://127.0.0.1:3108",
-    perceptionUrl: process.env.PIPERCEPTION_URL || "http://127.0.0.1:3110",
+    graphicsUrl: process.env.PIGRAPHICS_URL || "http://127.0.0.1:3201",
+    programUrl: process.env.PIPROGRAM_URL || "http://127.0.0.1:3200",
+    spaceUrl: process.env.PISPACE_URL || "http://127.0.0.1:3203",
+    perceptionUrl: process.env.PIPERCEPTION_URL || "http://127.0.0.1:3202",
     json: false,
   };
 

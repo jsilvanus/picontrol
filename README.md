@@ -45,8 +45,8 @@ The bottom navigation bar presents primary tabs:
 
 ### Running & Building the UI
 ```sh
-npm run dev:ui     # Starts Vite development server at http://localhost:5173
-npm run build:ui   # Typechecks and builds production bundle in ui/dist
+pnpm run dev:ui     # Starts Vite development server at http://localhost:5173
+pnpm run build:ui   # Typechecks and builds production bundle in ui/dist
 ```
 
 ---
@@ -56,9 +56,9 @@ npm run build:ui   # Typechecks and builds production bundle in ui/dist
 Command-line interface to monitor and control the entire Pi stack via `pigateway`.
 
 ### Global Options
-- `--gateway <url>`: Gateway URL (default `http://127.0.0.1:3100` or `PIGATEWAY_URL`)
-- `--youtube <url>`: pitube URL (default `http://127.0.0.1:3105` or `PITUBE_URL`)
-- `--tally <url>`: pilight URL (default `http://127.0.0.1:3200` or `PILIGHT_URL`)
+- `--gateway <url>`: Gateway URL (default `http://127.0.0.1:3000` or `PIGATEWAY_URL`)
+- `--youtube <url>`: pitube URL (default `http://127.0.0.1:3500` or `PITUBE_URL`)
+- `--tally <url>`: pilight URL (default `http://127.0.0.1:3107` or `PILIGHT_URL`)
 - `--api-key <key>`: Gateway API authorization token (`PIGATEWAY_API_KEY`)
 - `--json`: Output raw JSON for scripts and agents
 
@@ -142,8 +142,8 @@ In production, `picontrol` is deployed as a **static build** served directly by 
 - **Static Assets**: Nginx serves the pre-compiled UI (`ui/dist`) directly with aggressive asset caching.
 - **Local Domain & Router Split-DNS**: The local church router overrides DNS so all devices on the LAN resolve `keskuskirkko.fi` directly to the local Pi's IP address. The Pi is also configured locally in `/etc/hosts` to answer to that domain name.
 - **Reverse Proxy Routing**:
-  - `/api/...` & `/multiview`: Proxied to `pigateway` (`http://127.0.0.1:3100`) with unbuffered SSE support for `/api/v1/events`.
-  - `/mcp`: Proxied to `picontrol-mcp` (`http://127.0.0.1:3200`) for AI agent tool execution and OAuth/PAT headers.
+  - `/api/...` & `/multiview`: Proxied to `pigateway` (`http://127.0.0.1:3000`) with unbuffered SSE support for `/api/v1/events`.
+  - `/mcp`: Proxied to `picontrol-mcp` (`http://127.0.0.1:3600`) for AI agent tool execution and OAuth/PAT headers.
   - `/canva` (or dedicated port `:8443`): Proxied to `picanva` (`http://127.0.0.1:3103`) for slide generation.
 
 - **Authentication & Rights**:
@@ -158,8 +158,8 @@ Reference Nginx configuration: **[deploy/nginx/picontrol.conf](deploy/nginx/pico
 ## 4. Testing & Building Everything
 
 ```sh
-npm test         # Runs unit and integration test suite
-npm run build    # Compiles CLI TypeScript and UI bundle
+pnpm test         # Runs unit and integration test suite
+pnpm run build    # Compiles CLI TypeScript and UI bundle
 ```
 
 ---

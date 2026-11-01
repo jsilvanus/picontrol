@@ -8,10 +8,10 @@ This document details the planned UI additions in `picontrol` for managing Tally
 
 ## 1. Overview & Data Flow
 
-`picontrol` manages tally lights through `pilight` (default port `3200`, proxied or direct via `pigateway`).
+`picontrol` manages tally lights through `pilight` (default port `3107`, proxied or direct via `pigateway`).
 
 ```
-[ picontrol Browser UI ] ──HTTP / REST──► [ pilight:3200 ] (or via pigateway proxy)
+[ picontrol Browser UI ] ──HTTP / REST──► [ pilight:3107 ] (or via pigateway proxy)
            ▲                                     │
            └──────────────SSE /api/v1/events─────┘
                                                  │
