@@ -67,7 +67,7 @@ The frontend is built with Vite into a static bundle containing HTML, JavaScript
 
 ```bash
 # Build the UI static production bundle
-npm run build:ui
+pnpm run build:ui
 ```
 
 The output artifacts are written to `ui/dist/`:

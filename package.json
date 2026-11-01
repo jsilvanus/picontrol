@@ -1,6 +1,7 @@
 {
   "name": "picontrol",
   "version": "0.2.0",
+  "packageManager": "pnpm@11.23.0",
   "private": true,
   "type": "module",
   "description": "Control plane UI housing and CLI for the Pi ecosystem (pigateway, pimatrix, pitube, pilight, pivoice)",
@@ -8,15 +9,22 @@
     "picontrol": "./bin/picontrol.mjs"
   },
   "scripts": {
-    "build:ui": "npm --prefix ui run build",
+    "build:ui": "pnpm --dir ui run build",
     "build:cli": "tsc -p tsconfig.json",
-    "build": "npm run build:cli && npm run build:ui",
+    "build": "pnpm run build:cli && pnpm run build:ui",
     "cli": "node bin/picontrol.mjs",
-    "dev:ui": "npm --prefix ui run dev",
+    "dev:ui": "pnpm --dir ui run dev",
     "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
     "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "pi": {
+    "service": "picontrol",
+    "displayName": "picontrol"
   }
 }

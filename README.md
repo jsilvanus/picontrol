@@ -45,8 +45,8 @@ The bottom navigation bar presents primary tabs:
 
 ### Running & Building the UI
 ```sh
-npm run dev:ui     # Starts Vite development server at http://localhost:5173
-npm run build:ui   # Typechecks and builds production bundle in ui/dist
+pnpm run dev:ui     # Starts Vite development server at http://localhost:5173
+pnpm run build:ui   # Typechecks and builds production bundle in ui/dist
 ```
 
 ---
@@ -158,8 +158,8 @@ Reference Nginx configuration: **[deploy/nginx/picontrol.conf](deploy/nginx/pico
 ## 4. Testing & Building Everything
 
 ```sh
-npm test         # Runs unit and integration test suite
-npm run build    # Compiles CLI TypeScript and UI bundle
+pnpm test         # Runs unit and integration test suite
+pnpm run build    # Compiles CLI TypeScript and UI bundle
 ```
 
 ---
