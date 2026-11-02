@@ -1,6 +1,6 @@
 # picontrol
 
-Ecosystem UI housing and CLI for the Pi stack: `pigateway`, `pimatrix`, `pitube`, `pilight`, `pivoice`, and `piprogram`.
+Ecosystem UI housing and CLI for the Pi stack: `pigateway`, `pimatrix`, `pitube`, `pitally`, `pivoice`, and `piprogram`.
 
 Provides **UI**, **CLI**, and **control plane access** for all church broadcast operations.
 
@@ -19,7 +19,7 @@ Provides **UI**, **CLI**, and **control plane access** for all church broadcast 
                              └───────────┬───────────┘
                ┌─────────────┬───────────┼───────────┬─────────────┐
                ▼             ▼           ▼           ▼             ▼
-          [ pitube ]   [ pilight ]  [ pivoice ] [ pimatrix ]  [ ATEM / Cam ]
+          [ pitube ]   [ pitally ]  [ pivoice ] [ pimatrix ]  [ ATEM / Cam ]
            YouTube       Tally       Audio &      Video &       Hardware
           Broadcasts    Lights      Captions     Routing       Switching
 ```
@@ -35,7 +35,7 @@ The bottom navigation bar presents primary tabs:
 - **Outputs**: Pi 1 (`hdmi 0`) & Pi 2 (`hdmi 1`) hardware outputs, crop/effects, and tactile switching.
 - **Video**: Double/single camera feeds, parameter matrix, PTZ directional controls, optical zoom, preset bank, and **operator tally cue buttons**.
 - **YouTube (`pitube`)**: Live broadcast selector, ad-hoc broadcast creation modal (`+ Uusi lähetys`), 16:9 confidence monitor iframe preview (`~30s delay`, muted for sound booth hygiene, with `[CC]` caption check), stream health, and **[ Aloita lähetys / Go Live ]** / **[ Lopeta lähetys / End ]** controls.
-- **Tally (`pilight`)**: 8-unit Tally-Ma wireless monitor strip, live PGM (Red) / PRV (Green) / OFF state toggles, talent `[ CALL ]` (flash 3x white), `[ HOLD ]`, `[ Brightness ]`, 9-LED cycle test, and **PTZ Camera Director Cues** (`Pan Left`, `Pan Right`, `Zoom In`, `Zoom Out`, `Cue Operator`).
+- **Tally (`pitally`)**: 8-unit Tally-Ma wireless monitor strip, live PGM (Red) / PRV (Green) / OFF state toggles, talent `[ CALL ]` (flash 3x white), `[ HOLD ]`, `[ Brightness ]`, 9-LED cycle test, and **PTZ Camera Director Cues** (`Pan Left`, `Pan Right`, `Zoom In`, `Zoom Out`, `Cue Operator`).
 - **Voice (`pivoice`)**: Microphone capture status, voice activity detection, live transcription feed from the Auditor hub, and modes (Auditor, Radio, Relay, YouTube).
 - **More (`...`) Overflow Button**: Tapping `...` opens a bottom sheet with the remaining destinations:
   - **Web Radio**: Icecast2 relay client status, transmission start/stop, and HTML5 audio confidence preview player.
@@ -58,7 +58,7 @@ Command-line interface to monitor and control the entire Pi stack via `pigateway
 ### Global Options
 - `--gateway <url>`: Gateway URL (default `http://127.0.0.1:3000` or `PIGATEWAY_URL`)
 - `--youtube <url>`: pitube URL (default `http://127.0.0.1:3500` or `PITUBE_URL`)
-- `--tally <url>`: pilight URL (default `http://127.0.0.1:3107` or `PILIGHT_URL`)
+- `--tally <url>`: pitally URL (default `http://127.0.0.1:3107` or `PITALLY_URL`)
 - `--api-key <key>`: Gateway API authorization token (`PIGATEWAY_API_KEY`)
 - `--json`: Output raw JSON for scripts and agents
 
@@ -80,7 +80,7 @@ picontrol youtube start                                   # Transition broadcast
 picontrol youtube stop                                    # Transition broadcast to COMPLETE
 ```
 
-#### Tally Lights & Director Cues (pilight)
+#### Tally Lights & Director Cues (pitally)
 ```sh
 picontrol tally list                                      # List all lights and states
 picontrol tally set tally01 pgm                           # Set solid Program (Red)

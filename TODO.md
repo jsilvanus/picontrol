@@ -75,9 +75,9 @@ A dedicated preview card showing the actual YouTube viewer stream (with ~30-seco
 
 ---
 
-## 4. Tally & Camera Director Cueing (pilight)
+## 4. Tally & Camera Director Cueing (pitally)
 
-> For full specification and component details, see [docs/pilight-integration.md](docs/pilight-integration.md).
+> For full specification and component details, see [docs/pitally-integration.md](docs/pitally-integration.md).
 
 ### Planned UI Additions:
 1. **Camera PTZ Page Director Cues**:

@@ -4,7 +4,7 @@
   "packageManager": "pnpm@11.23.0",
   "private": true,
   "type": "module",
-  "description": "Control plane UI housing and CLI for the Pi ecosystem (pigateway, pimatrix, pitube, pilight, pivoice)",
+  "description": "Control plane UI housing and CLI for the Pi ecosystem (pigateway, pimatrix, pitube, pitally, pivoice)",
   "bin": {
     "picontrol": "./bin/picontrol.mjs"
   },
