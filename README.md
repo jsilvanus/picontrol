@@ -144,7 +144,7 @@ In production, `picontrol` is deployed as a **static build** served directly by 
 - **Reverse Proxy Routing**:
   - `/api/...` & `/multiview`: Proxied to `pigateway` (`http://127.0.0.1:3000`) with unbuffered SSE support for `/api/v1/events`.
   - `/mcp`: Proxied to `picontrol-mcp` (`http://127.0.0.1:3600`) for AI agent tool execution and OAuth/PAT headers.
-  - `/canva` (or dedicated port `:8443`): Proxied to `picanva` (`http://127.0.0.1:3103`) for slide generation.
+  - `/canva` (or dedicated port `:8443`): Proxied to `canva-pieco-app` (`http://127.0.0.1:3103`) for slide generation.
 
 - **Authentication & Rights**:
   - **Operator Fail-Safe**: Physical sound booth console / LAN subnet is guaranteed full operator rights (`*:write`) to ensure an operator is never locked out during a service.

@@ -1,6 +1,6 @@
 # Deployment Guide: Nginx, Local DNS & Reverse Proxy
 
-This document outlines the production deployment architecture for `picontrol` and its associated Pi ecosystem services (`pigateway`, `picontrol-mcp`, and `picanva`).
+This document outlines the production deployment architecture for `picontrol` and its associated Pi ecosystem services (`pigateway`, `picontrol-mcp`, and `canva-pieco-app`).
 
 ---
 
@@ -32,7 +32,7 @@ This document outlines the production deployment architecture for `picontrol` an
  │   (ui/dist)                   │                  │                  │       │
  │           ▼                   ▼                  ▼                  ▼       │
  │    ┌─────────────┐     ┌─────────────┐    ┌─────────────┐    ┌────────────┐ │
- │    │ Static Files│     │  pigateway  │    │picontrol-mcp│    │  picanva   │ │
+ │    │ Static Files│     │  pigateway  │    │picontrol-mcp│    │  canva-pieco-app   │ │
  │    │  (HTML/JS)  │     │  Port 3000  │    │  Port 3600  │    │ Port 3103  │ │
  │    └─────────────┘     └─────────────┘    └─────────────┘    └────────────┘ │
  └─────────────────────────────────────────────────────────────────────────────┘
@@ -116,7 +116,7 @@ Nginx directs incoming requests based on path and port:
 | `/multiview` | `http://127.0.0.1:3000` | HTTP | Gateway multiview telemetry endpoint |
 | `/pipgm` | `http://127.0.0.1:3000` | HTTP | Gateway PGM rendering endpoint |
 | `/mcp` | `http://127.0.0.1:3600` | HTTP / SSE | Routes MCP tool calls & resources to `picontrol-mcp`, forwards `Authorization: Bearer` |
-| `/canva/` (or `:8443`) | `http://127.0.0.1:3103` | HTTP / HTTPS | Reverse proxy for `picanva` slide builder application |
+| `/canva/` (or `:8443`) | `http://127.0.0.1:3103` | HTTP / HTTPS | Reverse proxy for `canva-pieco-app` slide builder application |
 
 ### Ready-to-Use Nginx Configuration File
 The reference configuration file is stored in this repo at:
@@ -154,7 +154,7 @@ This ensures zero latency on status indicators and avoids socket drops during qu
 All backend daemons run as systemd user or system services:
 - `pigateway.service` (Port 3000)
 - `picontrol-mcp.service` (Port 3600)
-- `picanva.service` (Port 3103, if running dynamically or served via static proxy)
+- `canva-pieco-app.service` (Port 3103, if running dynamically or served via static proxy)
 - `nginx.service` (Ports 80 / 443 / 8443)
 
 ---
