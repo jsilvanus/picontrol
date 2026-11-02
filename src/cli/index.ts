@@ -31,7 +31,7 @@ COMMANDS:
 GLOBAL OPTIONS:
   --gateway <url>            pigateway base URL (default: http://127.0.0.1:3000 or PIGATEWAY_URL)
   --youtube <url>            pitube base URL (default: http://127.0.0.1:3500)
-  --tally <url>              pilight base URL (default: http://127.0.0.1:3107)
+  --tally <url>              pitally base URL (default: http://127.0.0.1:3107)
   --rundown <url>            pirundown base URL (default: http://127.0.0.1:3400)
   --graphics <url>           pigraphics base URL (default: http://127.0.0.1:3201)
   --program <url>            piprogram base URL (default: http://127.0.0.1:3200)
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
   const config: CliConfig = {
     gatewayUrl: process.env.PIGATEWAY_URL || "http://127.0.0.1:3000",
     youtubeUrl: process.env.PITUBE_URL || "http://127.0.0.1:3500",
-    tallyUrl: process.env.PILIGHT_URL || "http://127.0.0.1:3107",
+    tallyUrl: process.env.PITALLY_URL || "http://127.0.0.1:3107",
     voiceUrl: process.env.PIVOICE_URL || "http://127.0.0.1:3106",
     apiKey: process.env.PIGATEWAY_API_KEY,
     soundUrl: process.env.PISOUND_URL || "http://127.0.0.1:3105",

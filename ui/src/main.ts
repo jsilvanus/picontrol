@@ -309,7 +309,7 @@ export function applyEcosystemVisibility(eco: EcosystemStatus): void {
     sound: "pisound",
     radio: "radioRelay",
     youtube: "pitube",
-    tally: "pilight",
+    tally: "pitally",
     inputs: "pimatrix",
     cameras: "cameras",
     voice: "pivoice",

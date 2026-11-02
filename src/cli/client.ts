@@ -181,7 +181,7 @@ export class GatewayClient {
     return this.request(this.youtubeUrl, "/api/v1/broadcasts/stop", "POST", confirmToken ? { confirmToken } : undefined);
   }
 
-  // --- Tally / pilight ---
+  // --- Tally / pitally ---
   async listTallyLights(): Promise<unknown[]> {
     return this.request(this.tallyUrl, "/api/v1/lights");
   }

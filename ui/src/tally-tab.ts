@@ -1,5 +1,5 @@
-// Tally tab & camera director PTZ cues (pilight integration for Tally-Ma wireless tally lights).
-// Talks to pilight (port 3107 or via gateway /api/v1/lights).
+// Tally tab & camera director PTZ cues (pitally integration for Tally-Ma wireless tally lights).
+// Talks to pitally (port 3107 or via gateway /api/v1/lights).
 
 export type FacetType =
   | "youtube-stream"
@@ -58,13 +58,13 @@ let selectedSetupLightId: string = "tally01";
 let errorMessage: string | null = null;
 let setupSaveSuccess: string | null = null;
 
-export function resolvePilightBase(search: string = window.location.search): string {
-  const fromQuery = new URLSearchParams(search).get("pilight");
-  const fromEnv = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_PILIGHT_URL;
+export function resolvePitallyBase(search: string = window.location.search): string {
+  const fromQuery = new URLSearchParams(search).get("pitally");
+  const fromEnv = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_PITALLY_URL;
   return (fromQuery ?? fromEnv ?? "/api/v1/lights").replace(/\/+$/, "");
 }
 
-const apiBase = resolvePilightBase();
+const apiBase = resolvePitallyBase();
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -86,7 +86,7 @@ async function request<T>(method: string, path: string = "", body?: unknown): Pr
   });
 
   if (!res.ok) {
-    let detail = `pilight returned ${res.status}`;
+    let detail = `pitally returned ${res.status}`;
     try {
       const err = await res.json();
       if (err?.error) detail = typeof err.error === "string" ? err.error : JSON.stringify(err.error);

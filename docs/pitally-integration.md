@@ -1,6 +1,6 @@
-# picontrol: pilight Tally & Director Cue UI Integration Plan
+# picontrol: pitally Tally & Director Cue UI Integration Plan
 
-> For the `pilight` backend protocol, endpoints, and CLI implementation, see [pilight/README.md](file:///d:/pilight/README.md).
+> For the `pitally` backend protocol, endpoints, and CLI implementation, see [pitally/README.md](file:///d:/pitally/README.md).
 
 This document details the planned UI additions in `picontrol` for managing Tally-Ma wireless tally lights, multi-status LED segmenting, and camera operator PTZ cueing.
 
@@ -8,10 +8,10 @@ This document details the planned UI additions in `picontrol` for managing Tally
 
 ## 1. Overview & Data Flow
 
-`picontrol` manages tally lights through `pilight` (default port `3107`, proxied or direct via `pigateway`).
+`picontrol` manages tally lights through `pitally` (default port `3107`, proxied or direct via `pigateway`).
 
 ```
-[ picontrol Browser UI ] ──HTTP / REST──► [ pilight:3107 ] (or via pigateway proxy)
+[ picontrol Browser UI ] ──HTTP / REST──► [ pitally:3107 ] (or via pigateway proxy)
            ▲                                     │
            └──────────────SSE /api/v1/events─────┘
                                                  │
