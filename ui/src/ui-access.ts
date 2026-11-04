@@ -48,6 +48,21 @@ export function applyModuleVisibility(): void {
   }
 }
 
+/**
+ * Picks the backend for this page. The LAN API (same origin through the Pi's nginx, or the given base) is tried
+ * first: an answer of 200 or 401 means it is reachable (401 = the PIN is needed). A 403, a network error or a
+ * timeout means outside the LAN, so the relay base (VITE_RELAY_URL) is used. With no relay base, the LAN is used.
+ */
+export async function chooseUiBackend(lanBase: string, relayBase: string): Promise<string> {
+  if (!relayBase) return lanBase;
+  try {
+    const res = await fetch(`${lanBase}/api/v1/matrix`, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(1500) });
+    return res.status === 200 || res.status === 401 ? lanBase : relayBase;
+  } catch {
+    return relayBase;
+  }
+}
+
 /** Sends the session cookie with every request to the UI listener base URL. */
 export function installCredentialedFetch(base: string): void {
   if (!base || typeof window === "undefined") return;
