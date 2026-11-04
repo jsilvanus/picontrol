@@ -60,6 +60,12 @@ dialog.broadcast-dialog::backdrop {
   backdrop-filter: blur(4px);
 }
 
+/* All broadcast-dialog inner content: max height + scroll on short phones */
+dialog.broadcast-dialog > div {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+
 /* ATEM view: preview is green, program is red, tie is amber (as on the switcher). */
 .atem-btn {
   height: 2.5rem;
@@ -86,5 +92,27 @@ dialog.broadcast-dialog::backdrop {
 .atem-dsk-sub { font-size: 0.6rem; font-weight: 500; opacity: 0.75; text-transform: uppercase; }
 @keyframes atem-pulse { from { opacity: 1; } to { opacity: 0.55; } }
 
-/* The Crop & Effects dialog scrolls on short phones (the Composite tab is taller). */
-#crop-modal-overlay > div { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+/* Scrollable code/URL boxes */
+.code-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.code-scroll::-webkit-scrollbar { display: none; }
+
+/* Tap highlight removal on interactive elements */
+button, a[onclick] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent pull-to-refresh on the fixed nav */
+nav {
+  overscroll-behavior: none;
+}
+
+/* Focus ring for accessibility */
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
