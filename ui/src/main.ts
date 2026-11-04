@@ -9,7 +9,7 @@ import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
 import { resolveApiUrl, resolveGatewayBaseUrl } from "./config";
-import { applyModuleVisibility, ensureUiSession, installCredentialedFetch } from "./ui-access";
+import { applyModuleVisibility, chooseUiBackend, ensureUiSession, installCredentialedFetch } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
 const originalFetch = window.fetch.bind(window);
@@ -2675,7 +2675,10 @@ export function copyMediaMtxPassword(): void {
 
 async function bootstrap(): Promise<void> {
   // PIN login and module visibility (ui-access.ts). Waits for the session before the rest starts.
-  const uiBase = resolveGatewayBaseUrl();
+  const lanBase = resolveGatewayBaseUrl();
+  const relayRaw = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_RELAY_URL ?? "";
+  const relayBase = relayRaw.replace(/\/+$/, "");
+  const uiBase = await chooseUiBackend(lanBase, relayBase);
   installCredentialedFetch(uiBase);
   await ensureUiSession(uiBase);
   applyModuleVisibility();
