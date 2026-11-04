@@ -33,11 +33,24 @@ export function enabledModules(): Set<string> {
   return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
 }
 
+/** Fetches the server-side module toggle list from the gateway. Returns null when not restricted. */
+export async function fetchServerModules(base: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`${base}/api/v1/ui/modules`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { modules: string[] | null; restricted: boolean };
+    return data.restricted ? data.modules : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Hides the tabs (and their "more" tiles) of modules that are not enabled. */
-export function applyModuleVisibility(): void {
-  const enabled = enabledModules();
+export function applyModuleVisibility(serverModules?: string[] | null): void {
+  const local = enabledModules();
+  const effective = serverModules != null ? new Set(serverModules) : local;
   for (const [module, tabs] of Object.entries(MODULE_TABS)) {
-    const show = enabled.has(module);
+    const show = effective.has(module);
     for (const tab of tabs) {
       const panel = document.getElementById(`tab-${tab}`);
       if (panel) panel.style.display = show ? "" : "none";
