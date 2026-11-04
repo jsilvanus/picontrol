@@ -5,18 +5,23 @@
  *   with localStorage key "picontrol.modules" (a comma list). Disabled modules are hidden, not removed.
  * - Credentials: requests to the UI listener base are sent with the session cookie.
  *
+ * Module names match piecosystem repo names (e.g. pimatrix, pivoice, piencoder, pitube, pisound, pitally).
  * Every access step is wrapped: a browser without storage or with blocked cookies still gets the page.
  */
 
+/** Maps a piecosystem repo name to the UI tabs it controls. */
 export const MODULE_TABS: Record<string, string[]> = {
-  matrix: ["inputs"],
-  outputs: ["outputs"],
-  pivoice: ["voice"],
-  piencoder: [],
-  pitube: ["youtube"]
+  pimatrix:    ["inputs", "outputs"],
+  pivoice:     ["voice"],
+  piencoder:   [],
+  pitube:      ["youtube"],
+  pisound:     ["sound"],
+  pitally:     ["tally"],
+  piprogram:   ["renderer"],
+  picam:       ["cameras"],
 };
 
-const DEFAULT_MODULES = "matrix,outputs,pivoice,piencoder,pitube";
+const DEFAULT_MODULES = "pimatrix,pivoice,piencoder,pitube";
 const STORAGE_KEY = "picontrol.modules";
 
 export function enabledModules(): Set<string> {
@@ -33,11 +38,24 @@ export function enabledModules(): Set<string> {
   return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
 }
 
+/** Fetches the server-side module toggle list from the gateway. Returns null when not restricted. */
+export async function fetchServerModules(base: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`${base}/api/v1/ui/modules`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { modules: string[] | null; restricted: boolean };
+    return data.restricted ? data.modules : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Hides the tabs (and their "more" tiles) of modules that are not enabled. */
-export function applyModuleVisibility(): void {
-  const enabled = enabledModules();
+export function applyModuleVisibility(serverModules?: string[] | null): void {
+  const local = enabledModules();
+  const effective = serverModules != null ? new Set(serverModules) : local;
   for (const [module, tabs] of Object.entries(MODULE_TABS)) {
-    const show = enabled.has(module);
+    const show = effective.has(module);
     for (const tab of tabs) {
       const panel = document.getElementById(`tab-${tab}`);
       if (panel) panel.style.display = show ? "" : "none";
@@ -112,7 +130,7 @@ export async function ensureUiSession(base: string): Promise<{ role: string } | 
           body: JSON.stringify({ pin: input.value })
         });
         if (!res.ok) {
-          error.textContent = "Väärä PIN";
+          error.textContent = "V\u00e4\u00e4r\u00e4 PIN";
           input.value = "";
           input.focus();
           return;
