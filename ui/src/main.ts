@@ -9,7 +9,8 @@ import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
 import { resolveApiUrl, resolveGatewayBaseUrl } from "./config";
-import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch } from "./ui-access";
+import { applyModuleVisibility, chooseUiBackend, ensureUiSession, installCredentialedFetch } from "./ui-access";
+import { renderCard, renderStatusDot, renderBadge } from "@piecosystem/piui";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
 const originalFetch = window.fetch.bind(window);
@@ -150,7 +151,7 @@ const DEFAULT_PRESET_NAMES: Record<string, Record<number, string>> = {
 };
 
 // Application State
-let activeTab: FrontendTabId = "outputs";
+let activeTab: FrontendTabId | "status" = "outputs";
 const sourcesMap = new Map<string, SourceItem>();
 const outputsMap = new Map<string, OutputSnapshot>();
 const effectsMap = new Map<string, EffectsPipeline>();
@@ -262,7 +263,6 @@ function generatePresetThumbnailDataUrl(
 // Ecosystem & Conditional UI State
 // ============================================================================
 let latestEcosystem: EcosystemStatus | null = null;
-let serverModules: string[] | null = null;
 
 export function applyEcosystemVisibility(eco: EcosystemStatus): void {
   latestEcosystem = eco;
@@ -337,66 +337,6 @@ export function applyEcosystemVisibility(eco: EcosystemStatus): void {
     switchTab("outputs", true);
     showToast(`Navigated to Outputs (${activeTab} is currently not in use)`);
   }
-
-  if (activeTab === "status") renderStatusTab();
-}
-
-function renderStatusTab(): void {
-  const root = document.getElementById("status-root");
-  if (!root) return;
-  const eco = latestEcosystem;
-
-  const moduleInfo: Array<{ key: string; label: string; component?: string }> = [
-    { key: "matrix", label: "Matrix (pimatrix)", component: "pimatrix" },
-    { key: "outputs", label: "Outputs", component: undefined },
-    { key: "pivoice", label: "PiVoice", component: "pivoice" },
-    { key: "piencoder", label: "Encoder (piencoder)", component: "piencoder" },
-    { key: "pitube", label: "PiTube (YouTube)", component: "pitube" },
-    { key: "pisound", label: "PiSound", component: "pisound" },
-    { key: "pitally", label: "PiTally", component: "pitally" },
-    { key: "radio", label: "Radio Relay", component: "radioRelay" },
-    { key: "pispace", label: "PiSpace", component: "cameras" },
-    { key: "piprogram", label: "PiProgram", component: "piprogram" },
-  ];
-
-  const effectiveModules = serverModules != null ? new Set(serverModules) : null;
-
-  const cards = moduleInfo.map(({ key, label, component }) => {
-    const comp = component && eco?.components?.[component];
-    const active = comp?.active ?? false;
-    const available = comp?.available ?? false;
-    const configured = comp?.configured ?? false;
-    const toggled = effectiveModules == null || effectiveModules.has(key);
-
-    const statusColor = active ? "bg-emerald-500" : available ? "bg-amber-400" : "bg-slate-400";
-    const toggleBadge = effectiveModules != null
-      ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${toggled ? "bg-primary/20 text-primary" : "bg-surface-container-highest text-on-surface-variant"}">${toggled ? "ON" : "OFF"}</span>`
-      : "";
-    const details = comp ? `<span class="text-[10px] text-on-surface-variant">${comp.description || (active ? "Active" : available ? "Available" : "Unavailable")}</span>` : `<span class="text-[10px] text-on-surface-variant opacity-50">Not tracked</span>`;
-
-    return `<div class="flex items-center gap-3 p-3 rounded-xl bg-surface-container border border-outline-variant/30">
-      <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusColor}"></div>
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="font-label-md text-[13px] font-semibold text-on-surface">${label}</span>
-          ${toggleBadge}
-        </div>
-        ${details}
-      </div>
-    </div>`;
-  }).join("");
-
-  const probedAt = eco?.updatedAt ? `<span class="text-[10px] text-on-surface-variant">Updated: ${new Date(eco.updatedAt).toLocaleTimeString()}</span>` : "";
-
-  root.innerHTML = `
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="font-headline-sm text-[15px] font-bold text-on-surface">Module Status</h2>
-      <div class="flex items-center gap-2">
-        ${probedAt}
-        <button type="button" onclick="triggerEcosystemProbe()" class="px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-primary-container text-on-surface-variant hover:text-on-primary-container font-label-sm text-[11px] uppercase font-semibold transition-all active:scale-95">Probe</button>
-      </div>
-    </div>
-    <div class="flex flex-col gap-2">${cards}</div>`;
 }
 
 export async function triggerEcosystemProbe(): Promise<void> {
@@ -419,9 +359,9 @@ export async function triggerEcosystemProbe(): Promise<void> {
 // ============================================================================
 // Navigation & Header State
 // ============================================================================
-function switchTab(tab: FrontendTabId, pushUrl = true): void {
+function switchTab(tab: FrontendTabId | "status", pushUrl = true): void {
   activeTab = tab;
-  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "sound", "status"];
+  const tabs: (FrontendTabId | "status")[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "sound", "status"];
   for (const t of tabs) {
     const panel = document.getElementById("tab-" + t);
     const nav = document.getElementById("nav-" + t);
@@ -500,6 +440,11 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (icon) icon.textContent = "tune";
     if (title) title.textContent = "Äänimikseri";
     if (subtitle) subtitle.textContent = "Sali & Striimi Mikseri (London BLU-100)";
+  } else if (tab === "status") {
+    if (icon) icon.textContent = "hub";
+    if (title) title.textContent = "Ecosystem Status";
+    if (subtitle) subtitle.textContent = "Services & Component Health";
+    renderStatusTab();
   }
 
   updateAtemPolling();
@@ -508,10 +453,9 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   setVoiceTabActive(tab === "voice");
   setRadioTabActive(tab === "radio");
   setSoundTabActive(tab === "sound");
-  if (tab === "status") renderStatusTab();
 
   if (pushUrl && window.history && window.history.replaceState) {
-    const pathMap: Record<FrontendTabId, string> = {
+    const pathMap: Record<FrontendTabId | "status", string> = {
       outputs: "/outputs",
       inputs: "/inputs",
       cameras: "/cameras",
@@ -2402,6 +2346,7 @@ function connectSse(): void {
       const payload = JSON.parse((e as MessageEvent).data) as EcosystemStatus;
       if (payload && Array.isArray(payload.inUseTabs)) {
         applyEcosystemVisibility(payload);
+        if (activeTab === "status") renderStatusTab();
       }
     } catch {
       // ignore
@@ -2520,7 +2465,7 @@ function connectSse(): void {
 }
 
 // Expose global handlers for inline onclick attributes
-window.switchTab = (tab) => switchTab(tab, true);
+window.switchTab = (tab) => switchTab(tab as FrontendTabId | "status", true);
 window.openMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.showModal();
 window.closeMoreModal = () => (document.getElementById("more-modal-overlay") as HTMLDialogElement)?.close();
 window.selectMoreTab = (tab: FrontendTabId) => { switchTab(tab); window.closeMoreModal(); };
@@ -2736,6 +2681,81 @@ export function copyMediaMtxPassword(): void {
   }
 };
 
+// ============================================================================
+// Status Tab: Ecosystem Component Health using piui atoms
+// ============================================================================
+function renderStatusTab(): void {
+  const container = document.getElementById("status-tab-content");
+  if (!container) return;
+
+  if (!latestEcosystem) {
+    container.innerHTML = renderCard({
+      icon: "hub",
+      title: "Ecosystem Status",
+      content: `<div class="flex items-center gap-2 py-2">
+        ${renderStatusDot({ status: "standby", pulse: false })}
+        <span class="text-on-surface-variant text-[12px]">Waiting for ecosystem data…</span>
+      </div>`
+    });
+    return;
+  }
+
+  const eco = latestEcosystem;
+  const componentEntries = Object.entries(eco.components ?? {});
+
+  const cardsHtml = componentEntries.map(([key, comp]) => {
+    const dotStatus = comp.active ? "online" : comp.connecting ? "busy" : comp.available ? "standby" : "offline";
+    const badgeLabel = comp.inUse ? "ON" : "OFF";
+    const badgeVariant = comp.inUse ? "success" : "neutral";
+
+    const detailLines = [
+      comp.description ? `<span class="text-on-surface-variant">${comp.description}</span>` : "",
+      comp.url ? `<span class="font-mono text-[10px] text-primary truncate">${comp.url}</span>` : "",
+      comp.lastSeenAt ? `<span class="text-on-surface-variant/70">Last seen: ${new Date(comp.lastSeenAt).toLocaleTimeString()}</span>` : ""
+    ].filter(Boolean).join("
+");
+
+    return renderCard({
+      variant: comp.active ? "low" : "outlined",
+      badgeHtml: renderBadge({ label: badgeLabel, variant: badgeVariant, size: "xs", dot: dotStatus as any }),
+      title: comp.name || key,
+      subtitle: comp.id,
+      content: `<div class="flex flex-col gap-0.5 text-[11px]">
+        ${detailLines || `<span class="text-on-surface-variant">No details available</span>`}
+      </div>`
+    });
+  });
+
+  if (cardsHtml.length === 0) {
+    container.innerHTML = renderCard({
+      icon: "hub",
+      title: "No Components",
+      content: `<div class="flex items-center gap-2 py-2">
+        ${renderStatusDot({ status: "noData" })}
+        <span class="text-on-surface-variant text-[12px]">No ecosystem components found.</span>
+      </div>`
+    });
+    return;
+  }
+
+  const overallCount = eco.activePlugins?.length ?? 0;
+  const summaryBadge = renderBadge({
+    label: `${overallCount} active`,
+    variant: overallCount > 0 ? "success" : "neutral",
+    dot: overallCount > 0 ? "online" : "offline"
+  });
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between mb-1">
+      <span class="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">Components</span>
+      ${summaryBadge}
+    </div>
+    <div class="space-y-space-sm">
+      ${cardsHtml.join("
+")}
+    </div>`;
+}
+
 async function bootstrap(): Promise<void> {
   // PIN login and module visibility (ui-access.ts). Waits for the session before the rest starts.
   const lanBase = resolveGatewayBaseUrl();
@@ -2744,8 +2764,7 @@ async function bootstrap(): Promise<void> {
   const uiBase = await chooseUiBackend(lanBase, relayBase);
   installCredentialedFetch(uiBase);
   await ensureUiSession(uiBase);
-  serverModules = await fetchServerModules(uiBase);
-  applyModuleVisibility(serverModules);
+  applyModuleVisibility();
   bindDialogBackdropDismiss("auth-modal-overlay");
   bindDialogBackdropDismiss("mediamtx-modal-overlay");
   updateAuthHeaderBadge();
@@ -2787,6 +2806,7 @@ async function bootstrap(): Promise<void> {
     .then((eco) => {
       if (eco?.inUseTabs) {
         applyEcosystemVisibility(eco);
+        if (activeTab === "status") renderStatusTab();
       }
     })
     .catch(() => undefined);
