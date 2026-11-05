@@ -28,10 +28,10 @@ let isTabActive = false;
 let currentStatus: RadioRelayStatus | null = null;
 let currentMode: RadioMode = "auto";
 let isBusy = false;
-const defaultRadioUrl: string = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/live.mp3";
+const defaultRadioUrl: string = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/keskuskirkko";
 let streamAudioUrl: string = defaultRadioUrl;
-let streamName: string = "radio-live";
-let mountPoint: string = "/live.mp3";
+let streamName: string = "keskuskirkko";
+let mountPoint: string = "/keskuskirkko";
 let soundComingIn = true;
 let captionsComingIn = true;
 
@@ -450,8 +450,8 @@ function attachHandlers(): void {
     saveBtn.onclick = () => {
       const nameInput = document.getElementById("radio-input-name") as HTMLInputElement | null;
       const mountInput = document.getElementById("radio-input-mount") as HTMLInputElement | null;
-      const name = nameInput?.value.trim() || "keskuskirkko-live";
-      const mount = mountInput?.value.trim() || "/live.mp3";
+      const name = nameInput?.value.trim() || "keskuskirkko";
+      const mount = mountInput?.value.trim() || "/keskuskirkko";
       void saveRadioSetup(name, mount);
     };
   }

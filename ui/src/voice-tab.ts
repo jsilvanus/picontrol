@@ -53,9 +53,9 @@ let message = "";
 let recentTranscripts: TranscriptItem[] = [];
 let radioState: RadioRelayState | null = null;
 let currentCaptureMode: CaptureMode = "auto";
-const defaultRadioUrl = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/live.mp3";
-let radioStreamName = "radio-live";
-let radioMountPoint = "/live.mp3";
+const defaultRadioUrl = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/keskuskirkko";
+let radioStreamName = "keskuskirkko";
+let radioMountPoint = "/keskuskirkko";
 let streamAudioUrl = defaultRadioUrl;
 
 export function resolveVoiceBase(search: string = window.location.search): string {
