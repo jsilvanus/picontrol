@@ -12,11 +12,11 @@ This document outlines the production deployment architecture for `picontrol` an
                            [ Local Church LAN Clients ]
                           (Phones, Tablets, Booth Touchscreens)
                                         │
-                                        │ http://keskuskirkko.fi (or HTTPS)
+                                        │ http://keskuskirkko.riihimaenseurakunta.fi (or HTTPS)
                                         ▼
                         ┌───────────────────────────────┐
                         │      Local Router / DNS       │
-                        │ (Maps keskuskirkko.fi -> Pi) │
+                        │ (Maps keskuskirkko.riihimaenseurakunta.fi -> Pi) │
                         └───────────────┬───────────────┘
                                         │
                                         ▼
@@ -25,7 +25,7 @@ This document outlines the production deployment architecture for `picontrol` an
  │                                                                             │
  │   ┌─────────────────────────────────────────────────────────────────────┐   │
  │   │                             NGINX                                   │   │
- │   │  server_name: keskuskirkko.fi, control.keskuskirkko.fi             │   │
+ │   │  server_name: keskuskirkko.riihimaenseurakunta.fi                   │   │
  │   └───────┬───────────────────┬──────────────────┬──────────────────┬───┘   │
  │           │                   │                  │                  │       │
  │   Static Assets        /api/ & SSE             /mcp            /canva /:8443│
@@ -45,18 +45,18 @@ This document outlines the production deployment architecture for `picontrol` an
 To provide seamless access to the sound booth control panel without needing cloud roundtrips or internet access:
 
 1. **Church Domain Name:**
-   - The production interface is addressed at the church domain (e.g. `keskuskirkko.fi` or `control.keskuskirkko.fi`).
+   - The production interface is addressed at the church domain (e.g. `keskuskirkko.riihimaenseurakunta.fi`).
 2. **Local Router DNS Configuration:**
    - Configure the church router (or local DNS server, e.g., dnsmasq, UniFi, MikroTik, or Pi-hole) with a **DNS override / split-horizon DNS entry**:
      ```text
-     keskuskirkko.fi         IN A  192.168.1.50   # (Replace with Pi's static LAN IP)
-     control.keskuskirkko.fi IN A  192.168.1.50
+     keskuskirkko.riihimaenseurakunta.fi IN A  192.168.1.50   # (Replace with Pi's static LAN IP)
+
      ```
    - When booth operators connect via Wi-Fi or booth Ethernet, their devices automatically resolve the church domain directly to the local Pi.
 3. **Pi Local Resolution (`/etc/hosts`):**
    - The Pi itself is configured to resolve the domain to loopback so local agents and CLI tools operate consistently:
      ```text
-     127.0.0.1  localhost keskuskirkko.fi control.keskuskirkko.fi
+     127.0.0.1  localhost keskuskirkko.riihimaenseurakunta.fi
      ```
 
 ---
@@ -82,7 +82,7 @@ The frontend resolves the Gateway address according to the following precedence:
 3. **Build-time env variable**: `VITE_GATEWAY_URL` (configured in `ui/.env` or CI)
 4. **Default (Same-Host)**: When unset, empty (`""`), or set to `"same-origin"`, all API calls and SSE telemetry (`/api/...`) resolve **relative to the exact host and origin the static bundle is served from**.
 
-This allows the same static build to be served at `http://keskuskirkko.fi` and seamlessly communicate with the Gateway reverse proxy without CORS issues or hardcoded addresses. See [ui/.env.example](../ui/.env.example).
+This allows the same static build to be served at `http://keskuskirkko.riihimaenseurakunta.fi` and seamlessly communicate with the Gateway reverse proxy without CORS issues or hardcoded addresses. See [ui/.env.example](../ui/.env.example).
 
 ### Serving the Web App Directly from Gateway or a Subpath
 1. **When Gateway serves the static files directly (All-in-One)**:
