@@ -9,7 +9,7 @@ import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
 import { resolveApiUrl, resolveGatewayBaseUrl } from "./config";
-import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch } from "./ui-access";
+import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
 let activeUiBase: string | null = null;
@@ -494,7 +494,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   } else if (tab === "radio") {
     if (icon) icon.textContent = "radio";
     if (title) title.textContent = "Web Radio";
-    if (subtitle) subtitle.textContent = "Icecast2 Relay Transmission";
+    if (subtitle) subtitle.textContent = "Web Radio Relay Transmission";
   } else if (tab === "renderer") {
     if (icon) icon.textContent = "layers";
     if (title) title.textContent = "PiPGM Renderer";
@@ -2314,7 +2314,28 @@ function adjustPtzSpeed(delta: number): void {
 // Dialog light-dismiss backdrop fallback
 // ============================================================================
 function bindDialogBackdropDismiss(dialogId: string): void {
-  bindBackdropDismiss(document.getElementById(dialogId) as HTMLDialogElement | null);
+  const el = document.getElementById(dialogId) as HTMLDialogElement | null;
+  if (!el) return;
+  if (dialogId === "auth-modal-overlay") {
+    let pressStarted = false;
+    el.addEventListener("pointerdown", (e) => {
+      pressStarted = e.target === el;
+    });
+    el.addEventListener("click", (e) => {
+      const dismiss = e.target === el && pressStarted;
+      pressStarted = false;
+      if (dismiss && !isMandatoryAuth) {
+        closeAuthModal();
+      }
+    });
+    el.addEventListener("cancel", (e) => {
+      if (isMandatoryAuth) {
+        e.preventDefault();
+      }
+    });
+  } else {
+    bindBackdropDismiss(el);
+  }
 }
 
 // ============================================================================
@@ -2627,11 +2648,68 @@ function updateAuthHeaderBadge(): void {
   }
 }
 
+let pinModalResolve: (((value: { role: string } | null) => void) | null) = null;
+let isMandatoryAuth = false;
+
+export function promptPinModal(base: string, mandatory = true): Promise<{ role: string } | null> {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
+    if (!modal) {
+      resolve(null);
+      return;
+    }
+
+    pinModalResolve = resolve;
+    isMandatoryAuth = mandatory;
+    activeUiBase = base;
+
+    const closeBtn = document.getElementById("auth-close-btn");
+    const cancelBtn = document.getElementById("auth-cancel-btn");
+    const input = document.getElementById("auth-key-input") as HTMLInputElement | null;
+    const errorMsg = document.getElementById("auth-error-msg");
+    const desc = document.getElementById("auth-dialog-desc");
+    const title = document.getElementById("auth-dialog-title");
+
+    if (closeBtn) closeBtn.style.display = mandatory ? "none" : "";
+    if (cancelBtn) cancelBtn.style.display = mandatory ? "none" : "";
+    if (desc) desc.textContent = mandatory ? "Syötä PIN-koodi jatkaaksesi:" : "Syötä ohjaussalasana tai PIN-koodi:";
+    if (title) title.textContent = mandatory ? "PIN-kirjautuminen" : "Control Authentication";
+
+    if (errorMsg) {
+      errorMsg.textContent = "";
+      errorMsg.classList.add("hidden");
+    }
+
+    if (input) {
+      input.value = "";
+    }
+
+    if (!modal.open) {
+      modal.showModal();
+    }
+    input?.focus();
+  });
+}
+
+registerPinPromptHandler(promptPinModal);
+
 export function openAuthModal(): void {
   const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
   if (!modal) return;
+
+  isMandatoryAuth = false;
+  const closeBtn = document.getElementById("auth-close-btn");
+  const cancelBtn = document.getElementById("auth-cancel-btn");
   const input = document.getElementById("auth-key-input") as HTMLInputElement | null;
   const errorMsg = document.getElementById("auth-error-msg");
+  const desc = document.getElementById("auth-dialog-desc");
+  const title = document.getElementById("auth-dialog-title");
+
+  if (closeBtn) closeBtn.style.display = "";
+  if (cancelBtn) cancelBtn.style.display = "";
+  if (desc) desc.textContent = "Syötä ohjaussalasana tai PIN-koodi:";
+  if (title) title.textContent = "Control Authentication";
+
   if (input) {
     input.value = localStorage.getItem("pimatrix_auth_token") || "";
   }
@@ -2646,44 +2724,100 @@ export function openAuthModal(): void {
     errorMsg.classList.add("text-error", "hidden");
     errorMsg.textContent = "";
   }
-  modal.showModal();
+  if (!modal.open) {
+    modal.showModal();
+  }
+  input?.focus();
 }
 
 export function closeAuthModal(): void {
+  if (isMandatoryAuth) return; // Do not allow leaving this modal until a correct pin is given
   const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
   modal?.close();
+  if (pinModalResolve) {
+    pinModalResolve(null);
+    pinModalResolve = null;
+  }
 }
 
 export async function submitAuthPassword(): Promise<void> {
   const input = document.getElementById("auth-key-input") as HTMLInputElement | null;
   const rememberCheck = document.getElementById("auth-remember-check") as HTMLInputElement | null;
   const errorMsg = document.getElementById("auth-error-msg");
-  const key = input?.value?.trim() || "";
+  const pin = input?.value?.trim() || "";
+
+  if (!pin) {
+    if (errorMsg) {
+      errorMsg.textContent = "Syötä PIN-koodi";
+      errorMsg.classList.remove("hidden");
+    }
+    input?.focus();
+    return;
+  }
 
   try {
-    const res = await originalFetch("/api/v1/auth/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key })
-    });
+    const base = activeUiBase || "";
+    let sessionRole = "lan";
+    let loginOk = false;
 
-    if (res.ok) {
+    // 1. Authenticate with the UI listener session API
+    try {
+      const loginRes = await fetch(`${base}/ui/api/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin })
+      });
+      if (loginRes.ok) {
+        loginOk = true;
+        const body = (await loginRes.json()) as { role?: string };
+        sessionRole = body.role || "lan";
+      }
+    } catch {
+      // If UI listener endpoint is not reached, fall back to verify
+    }
+
+    // 2. Also check pimatrix legacy verify if UI listener wasn't reachable
+    if (!loginOk) {
+      try {
+        const verifyRes = await originalFetch("/api/v1/auth/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: pin })
+        });
+        if (verifyRes.ok) loginOk = true;
+      } catch {
+        // verify failed
+      }
+    }
+
+    if (loginOk) {
       if (rememberCheck?.checked) {
-        localStorage.setItem("pimatrix_auth_token", key);
+        localStorage.setItem("pimatrix_auth_token", pin);
       } else {
         localStorage.removeItem("pimatrix_auth_token");
       }
       updateAuthHeaderBadge();
-      closeAuthModal();
+      isMandatoryAuth = false;
+      const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
+      modal?.close();
+      if (pinModalResolve) {
+        pinModalResolve({ role: sessionRole });
+        pinModalResolve = null;
+      }
     } else {
       if (errorMsg) {
-        errorMsg.textContent = "Invalid API key / password for this PiMatrix node.";
+        errorMsg.textContent = "Väärä PIN-koodi (Wrong PIN)";
         errorMsg.classList.remove("hidden");
+      }
+      if (input) {
+        input.value = "";
+        input.focus();
       }
     }
   } catch (err) {
     if (errorMsg) {
-      errorMsg.textContent = "Network error verifying password: " + String(err);
+      errorMsg.textContent = "Yhteysvirhe: " + String(err);
       errorMsg.classList.remove("hidden");
     }
   }
@@ -2748,9 +2882,20 @@ async function bootstrap(): Promise<void> {
   activeUiBase = uiBase;
   installCredentialedFetch(uiBase);
   const session = await ensureUiSession(uiBase);
-  const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay";
+  const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
   serverModules = await fetchServerModules(uiBase);
   applyModuleVisibility(serverModules, isOutsideLan);
+
+  // If activeTab is now hidden by module toggles, switch to the first visible tab
+  const activeTabPanel = document.getElementById(`tab-${activeTab}`);
+  if (activeTabPanel && activeTabPanel.style.display === "none") {
+    const candidateTabs: FrontendTabId[] = ["outputs", "sound", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "status"];
+    const firstEnabled = candidateTabs.find((t) => {
+      const p = document.getElementById(`tab-${t}`);
+      return p && p.style.display !== "none";
+    });
+    if (firstEnabled) switchTab(firstEnabled, false);
+  }
   bindDialogBackdropDismiss("auth-modal-overlay");
   bindDialogBackdropDismiss("mediamtx-modal-overlay");
   updateAuthHeaderBadge();

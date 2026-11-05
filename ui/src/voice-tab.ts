@@ -53,9 +53,10 @@ let message = "";
 let recentTranscripts: TranscriptItem[] = [];
 let radioState: RadioRelayState | null = null;
 let currentCaptureMode: CaptureMode = "auto";
-let radioStreamName = "keskuskirkko-live";
+const defaultRadioUrl = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/live.mp3";
+let radioStreamName = "radio-live";
 let radioMountPoint = "/live.mp3";
-let streamAudioUrl = "https://nettiradio.keskuskirkko.fi/live.mp3";
+let streamAudioUrl = defaultRadioUrl;
 
 export function resolveVoiceBase(search: string = window.location.search): string {
   const fromQuery = new URLSearchParams(search).get("voice");
@@ -96,13 +97,18 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw new Error(res.status === 401 ? "Token rejected" : `pivoice answered ${res.status}`);
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`pivoice answered with non-JSON (${res.status} HTML response; verify pivoice reverse proxy or service)`);
+  }
   return (await res.json()) as T;
 }
 
 async function fetchTranscripts(): Promise<void> {
   try {
     const res = await fetch("/api/v1/transcripts?limit=10");
-    if (res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (res.ok && contentType.includes("application/json")) {
       const data = await res.json() as { transcripts?: TranscriptItem[] };
       if (Array.isArray(data.transcripts)) {
         recentTranscripts = data.transcripts;
@@ -116,7 +122,8 @@ async function fetchTranscripts(): Promise<void> {
 async function fetchRadioRelay(): Promise<void> {
   try {
     const res = await fetch("/api/v1/radio-relay");
-    if (res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (res.ok && contentType.includes("application/json")) {
       const data = await res.json() as { state?: RadioRelayState; streamName?: string };
       if (data) {
         radioState = data.state ?? null;
@@ -421,7 +428,7 @@ function render(status: VoiceStatus | null, config: VoiceConfig | null, error: s
 
           <div class="flex items-center justify-between text-[11px] pt-1">
             <span class="text-on-surface-variant">Kuulijoita verkossa: <strong class="font-mono text-primary">${radioListeners}</strong></span>
-            <span class="text-on-surface-variant">Jakelu: <strong class="font-mono text-on-surface">Icecast2 (128 kbps MP3)</strong></span>
+            <span class="text-on-surface-variant">Jakelu: <strong class="font-mono text-on-surface">Web Radio (MP3)</strong></span>
           </div>
         </div>
 
@@ -488,7 +495,7 @@ async function setMode(section: Section, mode: Mode): Promise<void> {
     await call("PUT", "/api/v1/config", { auditor: { mode } });
   } else if (section === "radio") {
     const config = await call<VoiceConfig>("GET", "/api/v1/config");
-    const targets = (config.radio?.targets ?? [{ id: "icecast", mode }]).map(target => ({ ...target, mode }));
+    const targets = (config.radio?.targets ?? [{ id: "relay", mode }]).map(target => ({ ...target, mode }));
     await call("PUT", "/api/v1/config", { radio: { targets } });
   } else {
     await call("PUT", "/api/v1/config", { captions: { [section]: { mode } } });

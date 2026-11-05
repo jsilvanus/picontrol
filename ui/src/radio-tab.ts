@@ -28,8 +28,9 @@ let isTabActive = false;
 let currentStatus: RadioRelayStatus | null = null;
 let currentMode: RadioMode = "auto";
 let isBusy = false;
-let streamAudioUrl: string = "https://nettiradio.keskuskirkko.fi/live.mp3";
-let streamName: string = "keskuskirkko-live";
+const defaultRadioUrl: string = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/live.mp3";
+let streamAudioUrl: string = defaultRadioUrl;
+let streamName: string = "radio-live";
 let mountPoint: string = "/live.mp3";
 let soundComingIn = true;
 let captionsComingIn = true;
@@ -320,7 +321,7 @@ function render(): void {
             <span class="material-symbols-outlined text-[18px] text-primary">settings</span>
             <h3 class="font-headline-sm text-[14px] font-bold text-on-surface">Web Radio Setup</h3>
           </div>
-          <span class="font-label-sm text-[10px] text-on-surface-variant">Icecast / Shoutcast Relay</span>
+          <span class="font-label-sm text-[10px] text-on-surface-variant">Web Radio Relay</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-body-sm">
@@ -402,7 +403,7 @@ function render(): void {
           </div>
           <div class="p-2 rounded-lg bg-surface-container border border-outline-variant/30">
             <span class="text-on-surface-variant block uppercase font-bold text-[9px]">Server Format</span>
-            <span class="font-bold text-on-surface font-mono text-[12px]">Icecast2 / MP3</span>
+            <span class="font-bold text-on-surface font-mono text-[12px]">Web Radio / MP3</span>
           </div>
           <div class="p-2 rounded-lg bg-surface-container border border-outline-variant/30">
             <span class="text-on-surface-variant block uppercase font-bold text-[9px]">Status</span>
