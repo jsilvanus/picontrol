@@ -51,7 +51,7 @@ export async function fetchServerModules(base: string): Promise<string[] | null>
 }
 
 /** Hides the tabs (and their "more" tiles) of modules that are not enabled. */
-export function applyModuleVisibility(serverModules?: string[] | null): void {
+export function applyModuleVisibility(serverModules?: string[] | null, isOutsideLan = false): void {
   const local = enabledModules();
   const effective = serverModules != null ? new Set(serverModules) : local;
   for (const [module, tabs] of Object.entries(MODULE_TABS)) {
@@ -64,6 +64,12 @@ export function applyModuleVisibility(serverModules?: string[] | null): void {
       });
     }
   }
+
+  const hideMultiview = isOutsideLan || !effective.has("pimatrix");
+  const topMv = document.getElementById("top-multiview-btn");
+  if (topMv) topMv.style.display = hideMultiview ? "none" : "";
+  const moreMv = document.getElementById("more-tile-multiview");
+  if (moreMv) moreMv.style.display = hideMultiview ? "none" : "";
 }
 
 /**
@@ -93,6 +99,8 @@ export function installCredentialedFetch(base: string): void {
   };
 }
 
+let activeSessionPromise: Promise<{ role: string } | null> | null = null;
+
 /** Resolves once a session exists; shows the PIN screen until then. */
 export async function ensureUiSession(base: string): Promise<{ role: string } | null> {
   if (!base) return { role: "local" };
@@ -106,7 +114,8 @@ export async function ensureUiSession(base: string): Promise<{ role: string } | 
   };
   const existing = await check();
   if (existing) return existing;
-  return new Promise((resolve) => {
+  if (activeSessionPromise) return activeSessionPromise;
+  return activeSessionPromise = new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.setAttribute("role", "dialog");
     overlay.style.cssText = "position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:#111;color:#eee;font-family:sans-serif";
@@ -137,6 +146,7 @@ export async function ensureUiSession(base: string): Promise<{ role: string } | 
         }
         const body = (await res.json()) as { role: string };
         overlay.remove();
+        activeSessionPromise = null;
         resolve(body);
       } catch {
         error.textContent = "Yhteys ei onnistu";

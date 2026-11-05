@@ -12,6 +12,7 @@ import { resolveApiUrl, resolveGatewayBaseUrl } from "./config";
 import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
+let activeUiBase: string | null = null;
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   let target: RequestInfo | URL = input;
@@ -38,7 +39,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   if (response.status === 401) {
     const urlStr = typeof target === "string" ? target : target instanceof URL ? target.href : target.url;
     if (!urlStr.includes("/api/v1/auth/verify")) {
-      openAuthModal();
+      if (activeUiBase && !urlStr.includes("/ui/api/")) {
+        void ensureUiSession(activeUiBase);
+      }
     }
   }
   return response;
@@ -2742,10 +2745,12 @@ async function bootstrap(): Promise<void> {
   const relayRaw = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_RELAY_URL ?? "";
   const relayBase = relayRaw.replace(/\/+$/, "");
   const uiBase = await chooseUiBackend(lanBase, relayBase);
+  activeUiBase = uiBase;
   installCredentialedFetch(uiBase);
-  await ensureUiSession(uiBase);
+  const session = await ensureUiSession(uiBase);
+  const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay";
   serverModules = await fetchServerModules(uiBase);
-  applyModuleVisibility(serverModules);
+  applyModuleVisibility(serverModules, isOutsideLan);
   bindDialogBackdropDismiss("auth-modal-overlay");
   bindDialogBackdropDismiss("mediamtx-modal-overlay");
   updateAuthHeaderBadge();
