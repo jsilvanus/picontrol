@@ -362,7 +362,7 @@ function renderStatusTab(): void {
   const effectiveModules = serverModules != null ? new Set(serverModules) : null;
 
   const cards = moduleInfo.map(({ key, label, component }) => {
-    const comp = component && eco?.components?.[component];
+    const comp = component ? eco?.components?.[component] : undefined;
     const active = comp?.active ?? false;
     const available = comp?.available ?? false;
     const configured = comp?.configured ?? false;
