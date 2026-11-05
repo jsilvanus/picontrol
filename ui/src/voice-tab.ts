@@ -1,6 +1,7 @@
 // Voice tab: Audio pipeline flow page (Capture -> STT -> Captions -> Web Radio).
-// Talks to pivoice's /api/v1 with a Bearer token and pigateway /api/v1/transcripts & /api/v1/radio-relay.
+// Talks to pigateway /api/v1/voice/*, /api/v1/voice/transcripts & /api/v1/radio-relay with ambient session PIN auth.
 import { renderCaptionItem } from "@piecosystem/piui";
+import { resolveGatewayBaseUrl, resolveApiUrl } from "./config";
 
 type Mode = "on" | "off" | "auto";
 type CaptureMode = "on" | "off" | "auto" | "schedule";
@@ -44,7 +45,6 @@ interface RadioRelayState {
 const MODES: Mode[] = ["on", "off", "auto"];
 const CAPTURE_MODES: CaptureMode[] = ["on", "off", "auto", "schedule"];
 const MODE_LABEL: Record<Mode | CaptureMode, string> = { on: "On", off: "Off", auto: "Auto", schedule: "Schedule" };
-const TOKEN_KEY = "picontrol.pivoiceToken";
 const POLL_MS = 2500;
 
 const base = resolveVoiceBase();
@@ -63,23 +63,22 @@ let streamAudioUrl = defaultRadioUrl;
 export function resolveVoiceBase(search: string = window.location.search): string {
   const fromQuery = new URLSearchParams(search).get("voice");
   const fromEnv = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_PIVOICE_URL;
-  return (fromQuery ?? fromEnv ?? "/voice").replace(/\/+$/, "");
+  if (fromQuery || fromEnv) {
+    return (fromQuery ?? fromEnv ?? "").replace(/\/+$/, "");
+  }
+  const gw = resolveGatewayBaseUrl(search);
+  return gw ? `${gw}/api/v1/voice` : "/api/v1/voice";
 }
 
-function readToken(): string {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY) ?? "";
-  } catch {
-    return "";
+function resolveVoiceEndpoint(path: string): string {
+  const clean = path.startsWith("/api/v1/") ? path.slice("/api/v1".length) : path.startsWith("/") ? path : `/${path}`;
+  if (base.endsWith("/api/v1/voice") || base === "/api/v1/voice") {
+    return `${base}${clean}`;
   }
-}
-
-function writeToken(value: string): void {
-  try {
-    sessionStorage.setItem(TOKEN_KEY, value);
-  } catch {
-    // Private windows can block storage
+  if (base.endsWith("/api/v1")) {
+    return `${base}${clean}`;
   }
+  return `${base}/api/v1${clean}`;
 }
 
 function escapeHtml(value: unknown): string {
@@ -91,14 +90,15 @@ function escapeHtml(value: unknown): string {
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Authorization: `Bearer ${readToken()}` };
+  const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${base}${path}`, {
+  const res = await fetch(resolveVoiceEndpoint(path), {
     method,
     headers,
+    credentials: "include",
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(res.status === 401 ? "Token rejected" : `pivoice answered ${res.status}`);
+  if (!res.ok) throw new Error(res.status === 401 ? "Unauthorized" : `pivoice answered ${res.status}`);
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
     throw new Error(`pivoice answered with non-JSON (${res.status} HTML response; verify pivoice reverse proxy or service)`);
@@ -108,7 +108,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 async function fetchTranscripts(): Promise<void> {
   try {
-    const res = await fetch("/api/v1/transcripts?limit=10");
+    const res = await fetch(resolveVoiceEndpoint("/transcripts?limit=10"), { credentials: "include" });
     const contentType = res.headers.get("content-type") || "";
     if (res.ok && contentType.includes("application/json")) {
       const data = await res.json() as { transcripts?: TranscriptItem[] };
@@ -123,7 +123,7 @@ async function fetchTranscripts(): Promise<void> {
 
 async function fetchRadioRelay(): Promise<void> {
   try {
-    const res = await fetch("/api/v1/radio-relay");
+    const res = await fetch(resolveApiUrl("/api/v1/radio-relay"), { credentials: "include" });
     const contentType = res.headers.get("content-type") || "";
     if (res.ok && contentType.includes("application/json")) {
       const data = await res.json() as { state?: RadioRelayState; streamName?: string; mountPoint?: string; publicUrl?: string };
@@ -450,17 +450,6 @@ function render(status: VoiceStatus | null, config: VoiceConfig | null, error: s
         </div>
       </div>
 
-      <!-- PIVOICE AUTH TOKEN CARD -->
-      <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 shadow-sm space-y-2">
-        <label class="font-label-md text-[12px] font-bold text-on-surface" for="voice-token">pivoice API Token</label>
-        <div class="flex gap-2">
-          <input id="voice-token" type="password" autocomplete="off" value="${escapeHtml(readToken())}"
-            class="flex-1 px-3 py-1.5 rounded-lg bg-surface-container-highest text-on-surface font-body-md text-[12px]" />
-          <button type="button" data-action="save-token" class="px-4 py-1.5 rounded-lg bg-primary text-on-primary font-label-md text-[12px] font-bold uppercase">Tallenna</button>
-        </div>
-        <p class="font-label-sm text-[10px] text-on-surface-variant">Istuntokohtainen token. pivoice sijainnissa: ${escapeHtml(base || "origin")}.</p>
-      </div>
-
       ${message ? `<p class="font-label-sm text-[11px] text-primary px-1 font-semibold">${escapeHtml(message)}</p>` : ""}
     </div>`;
 }
@@ -527,10 +516,6 @@ function onClick(event: Event): void {
     const section = target.dataset.section as Section;
     const mode = target.dataset.value as Mode;
     void run(() => setMode(section, mode), `${section} set to ${mode}`);
-  } else if (action === "save-token") {
-    const input = root?.querySelector<HTMLInputElement>("#voice-token");
-    writeToken(input?.value.trim() ?? "");
-    void run(async () => undefined, "Token saved");
   }
 }
 

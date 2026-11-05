@@ -18,11 +18,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://127.0.0.1:3000",
       "/multiview": "http://127.0.0.1:3000",
-      "/pipgm": "http://127.0.0.1:3000",
-      "/voice": {
-        target: "http://127.0.0.1:3106",
-        rewrite: (path) => path.replace(/^\/voice/, "")
-      }
+      "/pipgm": "http://127.0.0.1:3000"
     }
   }
 });
