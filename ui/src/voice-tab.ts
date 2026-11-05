@@ -37,6 +37,8 @@ interface RadioRelayState {
   listeners?: number;
   streamUrl?: string;
   streamName?: string;
+  mountPoint?: string;
+  publicUrl?: string;
 }
 
 const MODES: Mode[] = ["on", "off", "auto"];
@@ -124,10 +126,13 @@ async function fetchRadioRelay(): Promise<void> {
     const res = await fetch("/api/v1/radio-relay");
     const contentType = res.headers.get("content-type") || "";
     if (res.ok && contentType.includes("application/json")) {
-      const data = await res.json() as { state?: RadioRelayState; streamName?: string };
+      const data = await res.json() as { state?: RadioRelayState; streamName?: string; mountPoint?: string; publicUrl?: string };
       if (data) {
         radioState = data.state ?? null;
         if (data.streamName) radioStreamName = data.streamName;
+        if (data.mountPoint) radioMountPoint = data.mountPoint;
+        if (data.state?.mountPoint) radioMountPoint = data.state.mountPoint;
+        if (data.publicUrl) streamAudioUrl = data.publicUrl;
         if (data.state?.streamUrl) streamAudioUrl = data.state.streamUrl;
       }
     }

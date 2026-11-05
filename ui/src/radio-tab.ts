@@ -7,6 +7,8 @@ export interface RadioRelayStatus {
   configured: boolean;
   reachable: boolean;
   streamName: string;
+  mountPoint?: string;
+  publicUrl?: string;
   mode?: RadioMode;
   state?: {
     running?: boolean;
@@ -79,7 +81,9 @@ export async function fetchRadioData(): Promise<void> {
     if (status) {
       currentStatus = status;
       if (status.streamName) streamName = status.streamName;
+      if (status.mountPoint) mountPoint = status.mountPoint;
       if (status.mode) currentMode = status.mode;
+      if (status.publicUrl) streamAudioUrl = status.publicUrl;
       if (status.state?.streamUrl) streamAudioUrl = status.state.streamUrl;
       if (status.state?.mountPoint) mountPoint = status.state.mountPoint;
       if (status.state?.soundComingIn !== undefined) soundComingIn = status.state.soundComingIn;
