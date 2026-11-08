@@ -136,11 +136,11 @@ picontrol camera preset cam1 3 --save                     # Save current positio
 
 ## 3. Production Deployment (Nginx & Reverse Proxy)
 
-In production, `picontrol` is deployed as a **static build** served directly by **Nginx** at the church domain (e.g. `keskuskirkko.fi`).
+In production, `picontrol` is deployed as a **static build** served directly by **Nginx** at the church domain (e.g. `keskuskirkko.riihimaenseurakunta.fi`).
 
 ### Architecture Highlights
 - **Static Assets**: Nginx serves the pre-compiled UI (`ui/dist`) directly with aggressive asset caching.
-- **Local Domain & Router Split-DNS**: The local church router overrides DNS so all devices on the LAN resolve `keskuskirkko.fi` directly to the local Pi's IP address. The Pi is also configured locally in `/etc/hosts` to answer to that domain name.
+- **Local Domain & Router Split-DNS**: The local church router overrides DNS so all devices on the LAN resolve `keskuskirkko.riihimaenseurakunta.fi` directly to the local Pi's IP address. The Pi is also configured locally in `/etc/hosts` to answer to that domain name.
 - **Reverse Proxy Routing**:
   - `/api/...` & `/multiview`: Proxied to `pigateway` (`http://127.0.0.1:3000`) with unbuffered SSE support for `/api/v1/events`.
   - `/mcp`: Proxied to `picontrol-mcp` (`http://127.0.0.1:3600`) for AI agent tool execution and OAuth/PAT headers.

@@ -1,6 +1,6 @@
 /**
  * Access for the picontrol UI through the pigateway UI listener (PIGATEWAY_UI_PORT / _RELAY_PORT):
- * - PIN login: a session cookie from the listener; a login screen shows until the session exists.
+ * - PIN login: session cookie from the listener; auth-modal-overlay shows until the session exists.
  * - Module toggles: which modules are shown. Build-time VITE_PICONTROL_MODULES, overridable per browser
  *   with localStorage key "picontrol.modules" (a comma list). Disabled modules are hidden, not removed.
  * - Credentials: requests to the UI listener base are sent with the session cookie.
@@ -9,9 +9,25 @@
  * Every access step is wrapped: a browser without storage or with blocked cookies still gets the page.
  */
 
-/** Maps a piecosystem repo name to the UI tabs it controls. */
+/** Maps UI tabs to the module toggle keys that can enable them. */
+export const TAB_MODULE_MAP: Record<string, string[]> = {
+  outputs:  ["pimatrix", "outputs"],
+  inputs:   ["pimatrix", "matrix"],
+  sound:    ["pisound"],
+  cameras:  ["picam", "cameras", "pispace"],
+  youtube:  ["pitube"],
+  tally:    ["pitally"],
+  voice:    ["pivoice"],
+  radio:    ["radio", "radioRelay"],
+  renderer: ["piprogram"],
+  status:   [],
+};
+
+/** Maps a piecosystem repo name to the UI tabs it controls (kept for backward compatibility). */
 export const MODULE_TABS: Record<string, string[]> = {
   pimatrix:    ["inputs", "outputs"],
+  matrix:      ["inputs"],
+  outputs:     ["outputs"],
   pivoice:     ["voice"],
   piencoder:   [],
   pitube:      ["youtube"],
@@ -19,6 +35,10 @@ export const MODULE_TABS: Record<string, string[]> = {
   pitally:     ["tally"],
   piprogram:   ["renderer"],
   picam:       ["cameras"],
+  cameras:     ["cameras"],
+  pispace:     ["cameras"],
+  radio:       ["radio"],
+  radioRelay:  ["radio"],
 };
 
 const DEFAULT_MODULES = "pimatrix,pivoice,piencoder,pitube";
@@ -50,20 +70,40 @@ export async function fetchServerModules(base: string): Promise<string[] | null>
   }
 }
 
-/** Hides the tabs (and their "more" tiles) of modules that are not enabled. */
-export function applyModuleVisibility(serverModules?: string[] | null): void {
+/** Hides the tabs, bottom nav buttons, and more tiles of modules that are not enabled. */
+export function applyModuleVisibility(serverModules?: string[] | null, isOutsideLan = false): void {
   const local = enabledModules();
   const effective = serverModules != null ? new Set(serverModules) : local;
-  for (const [module, tabs] of Object.entries(MODULE_TABS)) {
-    const show = effective.has(module);
-    for (const tab of tabs) {
-      const panel = document.getElementById(`tab-${tab}`);
-      if (panel) panel.style.display = show ? "" : "none";
-      document.querySelectorAll<HTMLElement>(`[data-tab="${tab}"]`).forEach((el) => {
+
+  for (const [tab, moduleKeys] of Object.entries(TAB_MODULE_MAP)) {
+    const show = tab === "status" || moduleKeys.some((m) => effective.has(m));
+
+    // 1. Hide/show section panel
+    const panel = document.getElementById(`tab-${tab}`);
+    if (panel) panel.style.display = show ? "" : "none";
+
+    // 2. Hide/show bottom navigation item
+    const nav = document.getElementById(`nav-${tab}`);
+    if (nav) nav.style.display = show ? "flex" : "none";
+
+    // 3. Hide/show items in More modal or other data-tab containers
+    document.querySelectorAll<HTMLElement>(`[data-tab="${tab}"]`).forEach((el) => {
+      if (el !== nav) {
         el.style.display = show ? "" : "none";
-      });
-    }
+      }
+    });
   }
+
+  // Multiview is strictly hidden when accessing over internet (outside LAN) or when pimatrix is disabled
+  const showMultiview = !isOutsideLan && (effective.has("pimatrix") || effective.has("outputs"));
+  const topMv = document.getElementById("top-multiview-btn");
+  if (topMv) topMv.style.display = showMultiview ? "inline-flex" : "none";
+  const moreMv = document.getElementById("more-tile-multiview");
+  if (moreMv) moreMv.style.display = showMultiview ? "" : "none";
+
+  // Fast Sound button in header
+  const topSound = document.getElementById("top-sound-btn");
+  if (topSound) topSound.style.display = effective.has("pisound") ? "inline-flex" : "none";
 }
 
 /**
@@ -93,7 +133,17 @@ export function installCredentialedFetch(base: string): void {
   };
 }
 
-/** Resolves once a session exists; shows the PIN screen until then. */
+export type PinPromptFn = (base: string, mandatory: boolean) => Promise<{ role: string } | null>;
+
+let pinPromptHandler: PinPromptFn | null = null;
+
+export function registerPinPromptHandler(handler: PinPromptFn): void {
+  pinPromptHandler = handler;
+}
+
+let activeSessionPromise: Promise<{ role: string } | null> | null = null;
+
+/** Resolves once a session exists; invokes the pin prompt modal until then. */
 export async function ensureUiSession(base: string): Promise<{ role: string } | null> {
   if (!base) return { role: "local" };
   const check = async (): Promise<{ role: string } | null> => {
@@ -106,41 +156,14 @@ export async function ensureUiSession(base: string): Promise<{ role: string } | 
   };
   const existing = await check();
   if (existing) return existing;
-  return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.setAttribute("role", "dialog");
-    overlay.style.cssText = "position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:#111;color:#eee;font-family:sans-serif";
-    overlay.innerHTML = `<form style="display:flex;flex-direction:column;gap:12px;min-width:240px">
-      <label for="ui-pin">PIN</label>
-      <input id="ui-pin" type="password" inputmode="numeric" autocomplete="one-time-code" style="padding:10px;font-size:18px" />
-      <button type="submit" style="padding:10px;font-size:16px">Kirjaudu</button>
-      <div id="ui-pin-error" style="color:#f88;min-height:1em"></div></form>`;
-    document.body.appendChild(overlay);
-    const form = overlay.querySelector("form") as HTMLFormElement;
-    const input = overlay.querySelector("#ui-pin") as HTMLInputElement;
-    const error = overlay.querySelector("#ui-pin-error") as HTMLElement;
-    input.focus();
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      try {
-        const res = await fetch(`${base}/ui/api/login`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ pin: input.value })
-        });
-        if (!res.ok) {
-          error.textContent = "V\u00e4\u00e4r\u00e4 PIN";
-          input.value = "";
-          input.focus();
-          return;
-        }
-        const body = (await res.json()) as { role: string };
-        overlay.remove();
-        resolve(body);
-      } catch {
-        error.textContent = "Yhteys ei onnistu";
-      }
+  if (activeSessionPromise) return activeSessionPromise;
+
+  if (pinPromptHandler) {
+    activeSessionPromise = pinPromptHandler(base, true).finally(() => {
+      activeSessionPromise = null;
     });
-  });
+    return activeSessionPromise;
+  }
+
+  return null;
 }

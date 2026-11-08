@@ -7,6 +7,8 @@ export interface RadioRelayStatus {
   configured: boolean;
   reachable: boolean;
   streamName: string;
+  mountPoint?: string;
+  publicUrl?: string;
   mode?: RadioMode;
   state?: {
     running?: boolean;
@@ -28,9 +30,10 @@ let isTabActive = false;
 let currentStatus: RadioRelayStatus | null = null;
 let currentMode: RadioMode = "auto";
 let isBusy = false;
-let streamAudioUrl: string = "https://nettiradio.keskuskirkko.fi/live.mp3";
-let streamName: string = "keskuskirkko-live";
-let mountPoint: string = "/live.mp3";
+const defaultRadioUrl: string = (import.meta as unknown as { env: Record<string, string | undefined> }).env?.VITE_WEB_RADIO_URL || "https://radio.riihimaenseurakunta.fi/keskuskirkko";
+let streamAudioUrl: string = defaultRadioUrl;
+let streamName: string = "keskuskirkko";
+let mountPoint: string = "/keskuskirkko";
 let soundComingIn = true;
 let captionsComingIn = true;
 
@@ -78,7 +81,9 @@ export async function fetchRadioData(): Promise<void> {
     if (status) {
       currentStatus = status;
       if (status.streamName) streamName = status.streamName;
+      if (status.mountPoint) mountPoint = status.mountPoint;
       if (status.mode) currentMode = status.mode;
+      if (status.publicUrl) streamAudioUrl = status.publicUrl;
       if (status.state?.streamUrl) streamAudioUrl = status.state.streamUrl;
       if (status.state?.mountPoint) mountPoint = status.state.mountPoint;
       if (status.state?.soundComingIn !== undefined) soundComingIn = status.state.soundComingIn;
@@ -320,7 +325,7 @@ function render(): void {
             <span class="material-symbols-outlined text-[18px] text-primary">settings</span>
             <h3 class="font-headline-sm text-[14px] font-bold text-on-surface">Web Radio Setup</h3>
           </div>
-          <span class="font-label-sm text-[10px] text-on-surface-variant">Icecast / Shoutcast Relay</span>
+          <span class="font-label-sm text-[10px] text-on-surface-variant">Web Radio Relay</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px] font-body-sm">
@@ -402,7 +407,7 @@ function render(): void {
           </div>
           <div class="p-2 rounded-lg bg-surface-container border border-outline-variant/30">
             <span class="text-on-surface-variant block uppercase font-bold text-[9px]">Server Format</span>
-            <span class="font-bold text-on-surface font-mono text-[12px]">Icecast2 / MP3</span>
+            <span class="font-bold text-on-surface font-mono text-[12px]">Web Radio / MP3</span>
           </div>
           <div class="p-2 rounded-lg bg-surface-container border border-outline-variant/30">
             <span class="text-on-surface-variant block uppercase font-bold text-[9px]">Status</span>
@@ -449,8 +454,8 @@ function attachHandlers(): void {
     saveBtn.onclick = () => {
       const nameInput = document.getElementById("radio-input-name") as HTMLInputElement | null;
       const mountInput = document.getElementById("radio-input-mount") as HTMLInputElement | null;
-      const name = nameInput?.value.trim() || "keskuskirkko-live";
-      const mount = mountInput?.value.trim() || "/live.mp3";
+      const name = nameInput?.value.trim() || "keskuskirkko";
+      const mount = mountInput?.value.trim() || "/keskuskirkko";
       void saveRadioSetup(name, mount);
     };
   }

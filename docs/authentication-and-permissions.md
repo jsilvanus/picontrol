@@ -108,7 +108,7 @@ Each user account in the system store (`users.json` / state DB) includes:
 4. Top status bar shows: `🟢 BOOTH OPERATOR (Active)`.
 
 ### B. Remote / Multi-User Login
-1. Remote client loads `http://keskuskirkko.fi`.
+1. Remote client loads `http://keskuskirkko.riihimaenseurakunta.fi`.
 2. When client IP is not on the booth auto-whitelisted subnet:
    - UI displays current permissions as `viewer` (`*:read`) or opens the **User Login Modal**.
 3. User enters their **Username** and **Password**.
