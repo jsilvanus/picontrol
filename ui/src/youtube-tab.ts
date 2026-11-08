@@ -17,6 +17,7 @@ export interface BroadcastSummary {
 export interface PitubeStatus {
   service: string;
   state: "idle" | "ready" | "testing" | "live" | "complete" | "unknown";
+  mode?: "off" | "on_staging" | "on_live" | "auto";
   selectedBroadcast: BroadcastSummary | null;
   streamHealth: "good" | "ok" | "noData" | "poor" | "unknown";
   captions: {
@@ -50,6 +51,7 @@ export interface EncoderState {
 }
 
 export type AutoMode = "on" | "off" | "auto";
+export type YoutubeMode = "off" | "on_staging" | "on_live" | "auto";
 
 let containerEl: HTMLElement | null = null;
 let pollTimer: number | undefined;
@@ -64,7 +66,7 @@ let errorMessage: string | null = null;
 
 // Pipeline Auto modes
 let encoderAutoMode: AutoMode = "auto";
-let youtubeAutoMode: AutoMode = "auto";
+let youtubeAutoMode: YoutubeMode = "auto";
 
 // Push-to-see-video preview state
 let isPushVideoVisible = false;
@@ -153,6 +155,9 @@ export async function fetchYoutubeData(): Promise<void> {
 
     if (status) {
       currentStatus = status;
+      if (status.mode) {
+        youtubeAutoMode = status.mode;
+      }
       if (status.selectedBroadcast?.id) {
         selectedId = status.selectedBroadcast.id;
       }
@@ -274,12 +279,25 @@ function getHealthBadge(health: string): { label: string; bg: string; text: stri
   }
 }
 
-function renderAutoButtons(domain: "encoder" | "youtube", current: AutoMode): string {
+function renderAutoButtons(domain: "encoder" | "youtube", current: string): string {
+  if (domain === "youtube") {
+    const modes: { id: YoutubeMode; label: string }[] = [
+      { id: "off", label: "OFF" },
+      { id: "on_staging", label: "STAGING" },
+      { id: "on_live", label: "LIVE" },
+      { id: "auto", label: "AUTO" },
+    ];
+    return modes.map(m => {
+      const active = m.id === current;
+      const style = active ? "bg-primary text-on-primary shadow-sm font-bold" : "text-on-surface-variant bg-surface-container-highest hover:text-on-surface";
+      return `<button type="button" data-auto-domain="${domain}" data-auto-value="${m.id}" class="px-2 py-1 rounded-md text-[10px] font-label-sm uppercase transition-all ${style}">${m.label}</button>`;
+    }).join("");
+  }
   const modes: AutoMode[] = ["on", "off", "auto"];
   return modes.map(m => {
     const active = m === current;
-    const style = active ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant bg-surface-container-highest hover:text-on-surface";
-    return `<button type="button" data-auto-domain="${domain}" data-auto-value="${m}" class="px-2.5 py-1 rounded-md text-[10px] font-label-sm font-bold uppercase transition-all ${style}">${m.toUpperCase()}</button>`;
+    const style = active ? "bg-primary text-on-primary shadow-sm font-bold" : "text-on-surface-variant bg-surface-container-highest hover:text-on-surface";
+    return `<button type="button" data-auto-domain="${domain}" data-auto-value="${m}" class="px-2.5 py-1 rounded-md text-[10px] font-label-sm uppercase transition-all ${style}">${m.toUpperCase()}</button>`;
   }).join("");
 }
 
@@ -704,7 +722,10 @@ function attachHandlers(): void {
         encoderAutoMode = val;
         showToast(`Enkooderin automaatiotila: ${val.toUpperCase()}`);
       } else if (domain === "youtube") {
-        youtubeAutoMode = val;
+        youtubeAutoMode = val as YoutubeMode;
+        request("POST", "/mode", { mode: val }).catch((err: unknown) => {
+          showToast(`Tilan asetus epäonnistui: ${err instanceof Error ? err.message : String(err)}`);
+        });
         showToast(`YouTuben automaatiotila: ${val.toUpperCase()}`);
       }
       render();
