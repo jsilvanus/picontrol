@@ -9,11 +9,12 @@ import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopB
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
-import { resolveApiUrl, resolveGatewayBaseUrl } from "./config";
+import { resolveApiUrl, resolveGatewayBaseUrl, setRuntimeGatewayBase } from "./config";
 import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
 let activeUiBase: string | null = null;
+let relayMode = false;
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   let target: RequestInfo | URL = input;
@@ -35,6 +36,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
       headers.set("Authorization", `Bearer ${token}`);
     }
     init.headers = headers;
+  }
+  const targetUrl = typeof target === "string" ? target : target instanceof URL ? target.href : target.url;
+  if (activeUiBase && targetUrl.startsWith(activeUiBase)) {
+    init = { credentials: "include", ...(init || {}) };
   }
   const response = await originalFetch(target, init);
   if (response.status === 401) {
@@ -2413,7 +2418,34 @@ async function refreshOutputsState(): Promise<void> {
   renderOutputsTab();
 }
 
+/**
+ * Outside the LAN (the relay is the backend) the live stream is not offered: the relay listener serves a fixed
+ * allowlist and answers through request/response only. The header light then follows a session check instead.
+ */
+function startRelayHeartbeat(): void {
+  const sseDot = document.getElementById("sse-dot");
+  const sseText = document.getElementById("sse-status-text");
+  const beat = async (): Promise<void> => {
+    let ok = false;
+    try {
+      const res = await fetch(`${activeUiBase}/ui/api/session`, { credentials: "include" });
+      ok = res.ok;
+      if (res.status === 401) void ensureUiSession(activeUiBase ?? "");
+    } catch {
+      ok = false;
+    }
+    if (sseDot) sseDot.className = ok ? "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" : "w-2 h-2 rounded-full bg-error";
+    if (sseText) sseText.textContent = ok ? "ONLINE (RELAY)" : "RECONNECTING";
+  };
+  void beat();
+  window.setInterval(() => void beat(), 15000);
+}
+
 function connectSse(): void {
+  if (relayMode) {
+    startRelayHeartbeat();
+    return;
+  }
   const sse = new EventSource(resolveApiUrl("/api/v1/events?client=picontrol"));
   const sseDot = document.getElementById("sse-dot");
   const sseText = document.getElementById("sse-status-text");
@@ -2916,6 +2948,10 @@ async function bootstrap(): Promise<void> {
   const relayBase = relayRaw.replace(/\/+$/, "");
   const uiBase = await chooseUiBackend(lanBase, relayBase);
   activeUiBase = uiBase;
+  if (uiBase && uiBase === relayBase) {
+    setRuntimeGatewayBase(uiBase);
+    relayMode = true;
+  }
   installCredentialedFetch(uiBase);
   const session = await ensureUiSession(uiBase);
   uiPinSession = Boolean(uiBase && session);
