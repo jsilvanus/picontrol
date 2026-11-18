@@ -216,7 +216,7 @@ Then picontrol opens the feed focus view.
 
 ### Phases and pieces (Haiku-sized)
 
-**Phase 0, decisions (no code):** D1 left/right meaning, D2 auto-run rule, D3 relay may run lists or not (questions below).
+**Phase 0, decisions:** done (see Decisions below).
 
 **Phase 1, action list core (pigateway):**
 - A1 Zod schema and file store for action lists (create, get, list, delete, expiry), with tests.
@@ -232,7 +232,7 @@ Then picontrol opens the feed focus view.
 
 **Phase 3, Canva plugin (canva-pieco-app):**
 - C1 After the export task is `ready`, enable a Play options panel for that item.
-- C2 Options form: left or right (vertical only), feed 1 to 3, Pi output 1 to 3, projector 1, 2 or none, fade to black checkbox.
+- C2 Options form: feed 1 to 3, Pi output 1 to 3, projector (left = 1, right = 2, or none), fade to black checkbox.
 - C3 Go live: create the action list through the Canva listener, receive uuid and link, open the link in a new tab.
 - C4 Error states (list refused, gateway unreachable) with a plain next step.
 
@@ -243,7 +243,7 @@ Then picontrol opens the feed focus view.
 
 **Phase 5 (later):** pirundown action type `actionlist:run`.
 
-### Questions
-1. "Left or right" for vertical: is it the side of a side-by-side composite (the vertical-beside-video layout), or does it mean the left or right projector? If projector, it merges with the projector choice.
-2. Is one-tap with no confirm acceptable when opened on the church LAN (single-use, 15 minutes), with a confirm everywhere else?
-3. Should the relay (remote) be able to run lists that route a projector? I propose no.
+### Decisions (Juha, 2026-11-18)
+1. Left or right means the **projectors** (left = projector 1, right = projector 2). The left/right toggle and the projector choice are one control; the options form (C2) has feed, Pi output, projector (left or right), fade to black.
+2. One tap with no confirm is accepted on the church LAN (single-use, 15 minutes, valid session); elsewhere one Run button.
+3. The relay cannot run lists that route a projector (and, as before, cannot create them).
