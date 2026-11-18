@@ -13,6 +13,13 @@ export function normalizeBaseUrl(value: string | null | undefined): string {
   return trimmed.replace(/\/+$/, "");
 }
 
+let runtimeGatewayBase = "";
+
+/** Set by the UI start-up when it picked the relay (outside the LAN): every /api request then goes there. */
+export function setRuntimeGatewayBase(base: string): void {
+  runtimeGatewayBase = normalizeBaseUrl(base);
+}
+
 /**
  * Resolves the Gateway base URL for all API and telemetry communication.
  *
@@ -20,7 +27,7 @@ export function normalizeBaseUrl(value: string | null | undefined): string {
  *   1. Explicit `search` parameter or `window.location.search` (`?gateway=<url>` or `?api=<url>`)
  *   2. Injected window property: `window.__PICONTROL_GATEWAY_URL__`
  *   3. Build-time environment variable: `import.meta.env.VITE_GATEWAY_URL` or `VITE_PIGATEWAY_URL`
- *   4. Default: "" (Empty string = same host/origin that the static bundle is served from)
+ *   4. Runtime pick (setRuntimeGatewayBase), else "" (Empty string = same host/origin that the static bundle is served from)
  */
 export function resolveGatewayBaseUrl(search?: string): string {
   const queryStr = search !== undefined
@@ -60,8 +67,8 @@ export function resolveGatewayBaseUrl(search?: string): string {
     // Non-Vite / Node environment
   }
 
-  // Default: Same host that the build is served from
-  return "";
+  // Picked at start-up (relay outside the LAN), else the same host that the build is served from
+  return runtimeGatewayBase;
 }
 
 /**
