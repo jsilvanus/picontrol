@@ -105,8 +105,10 @@ export function createPipgmClient(options: ClientOptions) {
 
     // library
     prepareItem: (itemId: string, orientation: string) => call<unknown>("POST", `/items/${enc(itemId)}/prepare?orientation=${orientation}`, {}),
-    addHymn: (title: string, hymnNumber: string) => call<LibraryItem>("POST", "/items/hymn", { title, hymnNumber }),
-    addYoutube: (url: string) => call<LibraryItem>("POST", "/items/youtube", { url }),
+    addHymn: (title: string, hymnNumber: string, rawText: string) =>
+      call<LibraryItem>("POST", "/items/hymn", { title, ...(hymnNumber ? { hymnNumber } : {}), rawText }),
+    addYoutube: (urlOrId: string, title?: string) =>
+      call<LibraryItem>("POST", "/items/youtube", { urlOrId, ...(title ? { title } : {}) }),
 
     // URLs for <img>
     frameUrl(id: FeedId, width: number, bust: number): string {
@@ -129,9 +131,12 @@ export function createPoller(
   client: Pick<PipgmClient, "getPipelines">,
   handlers: PollerHandlers,
   interval: (pipelines: Pipeline[]) => number,
-  timers: { set: typeof setTimeout; clear: typeof clearTimeout } = { set: setTimeout, clear: clearTimeout }
+  timers: { set: (fn: () => void, ms: number) => unknown; clear: (handle: never) => void } = {
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>)
+  }
 ) {
-  let handle: ReturnType<typeof setTimeout> | undefined;
+  let handle: unknown;
   let running = false;
   let last: Pipeline[] = [];
 
@@ -157,13 +162,13 @@ export function createPoller(
     },
     stop(): void {
       running = false;
-      if (handle !== undefined) timers.clear(handle);
+      if (handle !== undefined) timers.clear(handle as never);
       handle = undefined;
     },
     /** Poll now, e.g. right after a control action. */
     refresh(): void {
       if (!running) return;
-      if (handle !== undefined) timers.clear(handle);
+      if (handle !== undefined) timers.clear(handle as never);
       void tick();
     }
   };

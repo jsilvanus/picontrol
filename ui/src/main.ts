@@ -4,6 +4,7 @@ import { bindBackdropDismiss } from "./dialog-dismiss";
 import { initQuickOptions } from "./quick-options";
 import { initCompositeTab, setCompositeContext } from "./composite-tab";
 import { initVoiceTab, setVoiceTabActive } from "./voice-tab";
+import { initRendererTab, setRendererTabActive } from "./renderer-tab";
 import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopBroadcast } from "./youtube-tab";
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
@@ -498,7 +499,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   } else if (tab === "renderer") {
     if (icon) icon.textContent = "layers";
     if (title) title.textContent = "PiPGM Renderer";
-    if (subtitle) subtitle.textContent = "Stub Placeholder";
+    if (subtitle) subtitle.textContent = "piprogram feeds, playlists and library";
   } else if (tab === "sound") {
     if (icon) icon.textContent = "tune";
     if (title) title.textContent = "Äänimikseri";
@@ -509,6 +510,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   setYoutubeTabActive(tab === "youtube");
   setTallyTabActive(tab === "tally");
   setVoiceTabActive(tab === "voice");
+  setRendererTabActive(tab === "renderer");
   setRadioTabActive(tab === "radio");
   setSoundTabActive(tab === "sound");
   if (tab === "status") renderStatusTab();
@@ -2911,6 +2913,7 @@ async function bootstrap(): Promise<void> {
   initCompositeTab(showToast);
   initQuickOptions(showToast, refreshOutputsState);
   initVoiceTab();
+  initRendererTab();
   const ytRoot = document.getElementById("youtube-root");
   if (ytRoot) initYoutubeTab(ytRoot);
   const tallyRoot = document.getElementById("tally-root");

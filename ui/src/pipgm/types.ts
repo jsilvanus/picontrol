@@ -46,6 +46,7 @@ export interface Pipeline {
   currentStepDetail: StepDescriptor | null;
   nextStepDetail: StepDescriptor | null;
   playbackState: PlaybackState;
+  slideFeed?: { hasSlide: boolean };
   playlist: LibraryItem[];
 }
 
