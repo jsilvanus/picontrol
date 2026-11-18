@@ -40,7 +40,7 @@ The bottom navigation bar presents primary tabs:
 - **More (`...`) Overflow Button**: Tapping `...` opens a bottom sheet with the remaining destinations:
   - **Web Radio**: Icecast2 relay client status, transmission start/stop, and HTML5 audio confidence preview player.
   - **Matrix Inputs**: Atlona 4x4 hardware video switcher routing and safety lock.
-  - **PiPGM Renderer**: Graphics & slide pipeline placeholder.
+  - **PiPGM Renderer**: operates the three piprogram feeds through the gateway (`/api/v1/pipgm/*`): feed cards with Next/Back/Pause/fade and a Kill audio button that is always visible, a feed focus view with the current picture, coming-up thumbnails and a draft playlist editor (drag to reorder, Apply), saved playlists (save, load, import, export, generate for a date), a library view and monitor tiles. Hidden unless the `piprogram` module is enabled (`VITE_PICONTROL_MODULES` at build, or `localStorage["picontrol.modules"]`). Writes that the relay listener refuses show a banner. Checked only against a mock API in headless Chromium; plan in `docs/piprogram-control-plan.md`.
   - **Multiview**: Direct link to the standalone multiview monitoring grid.
 
 ### Running & Building the UI
