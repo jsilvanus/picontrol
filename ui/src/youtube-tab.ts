@@ -117,30 +117,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 async function fetchAtemAndEncoder(): Promise<void> {
   try {
     const atemRes = await fetch("/api/v1/video-mixer");
-    if (atemRes.ok) {
-      atemState = await atemRes.json() as AtemState;
-    }
+    // A refused or failed answer (403 outside the LAN, 401, 5xx) means unknown, never "online".
+    atemState = atemRes.ok ? (await atemRes.json() as AtemState) : null;
   } catch {
-    if (!atemState) {
-      atemState = { connected: true, programInput: 1, previewInput: 2, recording: false, streaming: false };
-    }
+    atemState = null;
   }
 
   try {
     const encRes = await fetch("/api/v1/encoder");
-    if (encRes.ok) {
-      encoderState = await encRes.json() as EncoderState;
-    }
+    encoderState = encRes.ok ? (await encRes.json() as EncoderState) : null;
   } catch {
-    if (!encoderState) {
-      encoderState = {
-        configured: true,
-        connected: true,
-        name: "Matrox Monarch HDX",
-        encoder1: { mode: "rtmp", state: "STOPPED" },
-        encoder2: { mode: "record", state: "STOPPED" },
-      };
-    }
+    encoderState = null;
   }
 }
 
@@ -318,7 +305,7 @@ function render(): void {
   const canGoLive = Boolean(broadcastId) && !isLive;
 
   // ATEM status
-  const isAtemOnline = atemState?.connected ?? true;
+  const isAtemOnline = atemState?.connected === true;
   const atemPgm = atemState?.programInput ?? 1;
   const atemPrv = atemState?.previewInput ?? 2;
 
