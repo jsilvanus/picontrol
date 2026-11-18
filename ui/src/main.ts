@@ -2442,11 +2442,9 @@ function startRelayHeartbeat(): void {
 }
 
 function connectSse(): void {
-  if (relayMode) {
-    startRelayHeartbeat();
-    return;
-  }
-  const sse = new EventSource(resolveApiUrl("/api/v1/events?client=picontrol"));
+  // Outside the LAN the relay streams the same events (credentialed, fixed type list). If the stream cannot be
+  // kept open there (a proxy that buffers or drops it), fall back to the 15 s session check.
+  const sse = new EventSource(resolveApiUrl("/api/v1/events?client=picontrol"), { withCredentials: relayMode });
   const sseDot = document.getElementById("sse-dot");
   const sseText = document.getElementById("sse-status-text");
 
@@ -2571,7 +2569,13 @@ function connectSse(): void {
     }
   });
 
+  let relayErrors = 0;
   sse.addEventListener("error", () => {
+    if (relayMode && ++relayErrors >= 3) {
+      sse.close();
+      startRelayHeartbeat();
+      return;
+    }
     if (sseDot) sseDot.className = "w-2 h-2 rounded-full bg-error";
     if (sseText) sseText.textContent = "RECONNECTING";
   });
