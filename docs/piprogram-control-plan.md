@@ -146,3 +146,42 @@ Proposed file shape (`schema` is versioned):
 
 ### Order of work
 Gateway alignment (done in pigateway #33, needs deploying), piprogram playlist API, picontrol Operate and focus view, then generate-for-date.
+
+## 8. Work split into small pieces (2026-11-18)
+
+Each piece is one repo, one area, 1 to 3 files, and has a test or a curl check as its done condition. Corrections to the first draft of this split: the gateway `control` and `ftb` routes (old G1) and the stale hymn and slide actions (old G2) are done in pigateway #33; piprogram b8f17c1 on the Pi is 1.0 and serves `/control` (old B1 is settled); the UI is the picontrol tab (`picontrol/ui`), not a new pigateway page; WAN access is the existing relay listener (3012), LAN is 3011, 3010 is the Canva-only listener and 3000 the main API, so no new LAN/WAN classifier is needed, only new allowlist entries.
+
+### Backend: piprogram
+- **B1** `GET /pipelines/:id/playlist/steps`: the playlist flattened to one ordered step list (itemId, stepIndex, title, thumbnail URL or null, isActive). openapi entry and a test in `server.test.ts`.
+- **B2** `PUT /pipelines/:id/playlist/order {itemIds[]}`: atomic reorder or replace, 422 for ids not in the library. openapi and test.
+- **B3** Persist each feed's live playlist in the library store so a restart keeps it. Test with the fake store.
+- **B4** `src/playlist-store.ts`: save, load, list, delete saved playlists as `piprogram/playlists/<id>.json` in pistorage, memory fallback like `library-store.ts`. Unit tests only, no routes.
+- **B5** Routes `GET/POST /playlists`, `GET/PUT/DELETE /playlists/{id}` with Zod validation of the `piprogram.playlist/1` shape. openapi and tests. Needs B4.
+- **B6** `POST /pipelines/:id/playlist/save {name}`. Needs B5.
+- **B7** `POST /pipelines/:id/playlist/load {playlistId, mode}`: replaces or appends, reports missing items, keeps the active item while on air. Needs B5. Judgement needed; do with a bigger model.
+- **B8** `POST /playlists/generate {date}`: returns a draft from `useAt` matches, changes nothing. Needs B5.
+- **B9** Regenerate the client and add CLI subcommands `piprogram playlists list|get|save|load|export|import`. Needs B1 to B7.
+- **B10** (later) Pause entries and auto-advance seconds: model and persistence only.
+
+### Backend: pigateway
+- **G1** Proxy routes for B1, B2, B5 to B8 in `src/pipgm/pipgm-routes.ts`, with tests that check the upstream call. Needs those routes to exist.
+- **G2** `UI_ROUTES` entries (`src/ui/ui-listener.ts`): LAN gets all; relay gets reads, `steps`, `load` and control; `save`, `delete`, `generate`, `order`, import are `setup` (LAN only). Audio kill and stop stay allowed on the relay. Test per rule.
+- **G3** Update the pigateway OpenAPI and README for the new routes.
+- **G4** Deploy pigateway #33 and the later routes to the Pi from main (Pi agent, with Juha's go).
+
+### Frontend: picontrol/ui (plain TypeScript, `renderer-tab.ts`)
+- **F1** API client wrapper plus poller (1 s on air, 10 s idle): `getPipelines`, `getSteps`, `control`, `ftb`, `audioKill`. No UI.
+- **F2** Tab shell replacing the stub: feed cards (mockup tab A) and a fixed Kill audio button with the arm countdown. Needs F1.
+- **F3** Feed focus view: pinned current output (landscape full width, portrait mini top right). Needs F1.
+- **F4** Next, Back, Pause, fade to black and keyboard shortcuts (space and right arrow, left arrow, B). Needs F3.
+- **F5** Coming-up thumbnail strip from `steps`: item boundaries, tap to jump, placeholder plus Prepare. Needs B1.
+- **F6** Playlist draft editor: add from the library, drag to reorder, remove, Apply. Needs B2.
+- **F7** Save, load, export, import panel with the on-air confirm and the missing-items report. Needs B5 to B7.
+- **F8** Library view: use-at filter, kind filter, Canva task progress. Reads only.
+- **F9** Generate-for-date dialog. Needs B8.
+- **F10** Content add: hymn, YouTube, upload, PPTX, speak a phrase (LAN only).
+- **F11** Error banners (409 AUDIO_NOT_ARMED, 503 pistorage down, failed task) with a next step.
+- **F12** (later) Feed monitor tiles.
+
+### Order
+B1 and F1 to F4 first (first on-air screen), then B2 with F5 and F6, then B4 to B7 with G1, G2 and F7, then B8, F8 to F11, G3 and G4.
