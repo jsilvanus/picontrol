@@ -96,3 +96,53 @@ Tell me if you want arm and play on the relay too. Mark the new rules in `UI_ROU
 2. Arm and play audio from the relay: no (proposed) or yes?
 3. Should the tab also route a feed to Pi 1 / Pi 2 (one-tap "put this on the left projector"), or stay separate from Outputs?
 4. Live thumbnail via `frame.png` polling, or only step thumbnails? Chromium on the Pi must render frames (`PIPGM_CHROMIUM`), which costs CPU on a Pi 4 already near 84 °C under detection.
+
+## 7. Feed focus view and playlists (added 2026-11-18)
+
+Mockups: https://claude.ai/artifact/2y7UTFbxr6KBiAYyCHnmhk (tabs C and D). A second set of layout alternatives is at https://claude.ai/artifact/3WRnvAU52MQBxzxTkKs1f1.
+
+### Feed focus view
+Clicking a feed on the Operate view opens it. The current output is pinned to the top: full width in landscape, a mini vertical at the top right in portrait. Below it are the upcoming steps of the whole playlist as thumbnails, grouped by item so item boundaries stay visible. Tapping a thumbnail jumps to that step. Next, Back, Pause and fade to black sit under the pinned view. Thumbnails use the prepared step pictures (`steps/{n}/thumbnail.jpg`), so they cost the Pi nothing; only the pinned current view uses the live `frame.png`. Items without prepared pictures show a placeholder and a Prepare button. Jumping from a thumbnail on the relay needs a confirm.
+
+### Playlists: what exists
+Each pipeline has one in-memory playlist that holds copies of library items. The API has add and remove only. There is no reorder, no replace, no save, no load, and the playlist is lost on a piprogram restart.
+
+### Playlists: what is needed
+Each feed has one live playlist. Editing happens on a **draft** that goes on air only with "Apply to PiPGM n", so the audience never sees a half-edited list.
+
+- **Build:** add from the library, add a hymn by number, drag to reorder, remove, duplicate. Generate a draft for a date: library items whose `useAt` matches, ordered by a simple rule (hymns and liturgy, then PPTX, then Canva); the operator edits the result. Later: from a pirundown rundown, from a liturgy template.
+- **Save and load:** a saved playlist is a named JSON document stored in the library store (pistorage) at `piprogram/playlists/<id>.json`. It references library items by id, with kind and title as a fallback match, and a hymn can be rebuilt from its number. Loading replaces the draft; applying while on air keeps the current item until Next. A missing item is shown on load and never dropped silently.
+- **Export and import:** the same JSON as a file, to move playlists between Pis or to keep a copy.
+- **Reuse:** duplicate to another feed or to next week's date.
+
+Proposed file shape (`schema` is versioned):
+
+```json
+{
+  "schema": "piprogram.playlist/1",
+  "name": "Sunday mass, normal",
+  "savedAt": "2026-11-18T17:20:00Z",
+  "orientation": "landscape",
+  "items": [
+    { "itemId": "itm_8f2a", "kind": "hymn", "title": "Virsi 336", "hymn": { "number": 336 } },
+    { "itemId": "itm_c01d", "kind": "pptx", "title": "Kuulutukset" }
+  ]
+}
+```
+
+### API additions (piprogram, then pigateway)
+- `GET/POST /playlists`, `GET/PUT/DELETE /playlists/{id}`
+- `PUT /pipelines/{id}/playlist` with `{itemIds: []}` to replace or reorder atomically (the old PUT in the gateway already hints at this)
+- `POST /pipelines/{id}/playlist/load {playlistId, mode: replace|append}` and `POST /pipelines/{id}/playlist/save {name}`
+- `POST /playlists/generate {date}` returns a draft, changes nothing
+- Persist each feed's current playlist in the store so a restart keeps it.
+- Gateway: all routes proxied. LAN gets everything. Relay: read, load and apply; save, delete, import and generate stay LAN (`setup`).
+
+### Open questions
+1. Saved playlists as references (a changed slide updates everywhere; recommended, with a warning if an item changes after the service started) or frozen copies?
+2. One live playlist per feed plus saved ones as alternatives: enough?
+3. Pause markers and auto-advance between items: now or later?
+4. Is the focus view for one operator or an operator plus a monitor person?
+
+### Order of work
+Gateway alignment (done in pigateway #33, needs deploying), piprogram playlist API, picontrol Operate and focus view, then generate-for-date.
