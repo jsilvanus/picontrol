@@ -1,0 +1,96 @@
+# Plan: piprogram control in picontrol (tentative)
+
+Status: draft for discussion. Planning only, nothing here is implemented.
+
+## 1. What exists today
+
+picontrol does **not** control piprogram. It only shows it.
+
+- The **PiPGM Renderer** tab (`ui/index.html`, `tab-renderer`) is a stub placeholder. `main.ts` titles it "Stub Placeholder".
+- The Outputs and Inputs tabs treat `PiPGM1/2/3` as video sources: they route them to Pi 1 / Pi 2 outputs (Atlona in 3 and 4) and show the pipeline snapshot (`pipgmMap`, filled from the gateway `init` payload and the `pipgm` SSE event). That is pimatrix routing, not piprogram control.
+- The module toggle `piprogram` already maps to the `renderer` tab (`ui-access.ts`). It is not in `DEFAULT_MODULES`, so the tab is hidden unless `VITE_PICONTROL_MODULES` includes it.
+- The picontrol CLI has `pipgm pipelines`, `pipelines <id>` and a `next` step. These talk to piprogram directly (`--program`, default `http://127.0.0.1:3200`), not through the gateway, and a hymn action through `pipgm:hymn`.
+- **pigateway** already proxies piprogram (`PIGATEWAY_PIPROGRAM_API_URL`, `PIGATEWAY_PIPROGRAM_API_KEY`) under `/api/v1/pipgm/*` and lists those routes in the UI listener allowlist under module `piprogram` (LAN and relay; `DELETE items/:itemId` is `setup`, so LAN only).
+
+### Gap that blocks the UI: the gateway speaks the old API
+
+The gateway client (`pigateway/src/pipgm/client.ts`) was written for the old pimatrix `/api/v1/pipgm/*` routes. piprogram 1.0 renamed or added several:
+
+| Gateway calls (old) | piprogram 1.0 (`openapi.yaml`) |
+|---|---|
+| `PUT pipelines/:id` | `PUT pipelines/:id/config` |
+| `POST .../cue`, `/step`, `/play`, `/pause` | `POST .../control {action: next, prev, gotoStep, gotoItem, play, pause, stop, restart}` |
+| `POST .../audio` (arm) | `POST .../audio`, plus `POST .../audio/play {itemId, loop, volume}` (not proxied) |
+| `PUT .../playlist` | only `POST` add and `DELETE` item |
+| not proxied | `POST .../ftb`, `PUT .../basic-image`, `POST tts/prepare`, `GET .../frame.png`, `GET /pipgm/:id/stage`, items `hymn`, `youtube`, `media`, `pptx`, `GET assets/:id`, step `image.png` and `thumbnail.jpg` |
+| `POST items/:id/package` | `POST items/:id/canva/export-package` (the Canva path; the pigateway Canva routes may already use it, verify) |
+
+So step 1 of any UI work is aligning the gateway with piprogram 1.0 (or confirming it already runs against a piprogram that still serves the old paths).
+
+## 2. What piprogram can do (the control surface)
+
+Three feeds (`PiPGM1/2/3`) published to MediaMTX, routed to HDMI by pimatrix. piprogram never carries HDMI sound; only Atlona out 1 audio reaches the PA.
+
+- **Pipelines:** list, read, config (resolution, orientation), control (next, prev, goto step or item, play, pause, stop, restart), fade to black, basic image (what a feed shows when idle).
+- **Playlist:** add item, remove item.
+- **Library items:** hymn, YouTube, media (image, video, audio), PPTX, Canva; delete; `use-at` dates (pistorage pre-fetches 48 h before); step previews (`steps`, thumbnails) and `prepare`.
+- **Audio per feed:** arm for N seconds (default 900, max 3600), play an audio item (loop, volume, capped by `PIPGM_AUDIO_MAX_VOLUME`), stop, and a global **kill switch** that stops and disarms all feeds. Text to speech: `tts/prepare` renders a phrase to a library audio item (Piper, Finnish voices) which is then played with `audio/play`.
+- **Canva:** the Canva plugin pushes through pigateway `/api/v1/canva/push`; piprogram unpacks, prepares step pictures and reports a task (`tasks/:id`). The operator only needs to see progress and "ready".
+- **Frame:** `frame.png` renders the current stage (used for previews).
+- Writes need the API key (held by the gateway, never by the browser). Reads are open.
+
+## 3. Proposed UI: the PiPGM Renderer tab
+
+Replace the stub with a real tab, built in the existing style (`*-tab.ts` module next to `sound-tab.ts`, like `voice-tab.ts`). Phased so each phase is useful alone.
+
+**Phase A, operate (live service use):** one card per feed (1, 2, 3).
+- Current item, step n of m, playing state, live thumbnail (`frame.png`, throttled).
+- Prev / Next / Play / Pause / Stop; jump to a step from a step strip (step thumbnails).
+- Fade to black toggle per feed. Keep the existing per-input FTB in Outputs as is; this one is the feed-side fade.
+- Where the feed goes now (read-only: "on Pi 1 output") so the operator sees what the audience sees; routing stays in Outputs.
+- Audio: arm with countdown (`audioArmedUntil`), stop, and a red **Kill audio** button always visible on the tab.
+
+**Phase B, content (preparation):**
+- Library list with type icons and `use-at`, add to a feed's playlist, remove from the playlist.
+- Add: hymn (number), YouTube link, upload media, upload PPTX. Show Canva import tasks with progress and ready state.
+- Basic image picker per feed.
+- Text to speech: type a phrase, prepare, play on a feed (armed only). Show the 500 character limit.
+
+**Phase C, polish:** reorder playlist, pre-roll checks ("feed has content, sound armed, routed to an output"), mobile layout, i18n keys consistent with the other tabs.
+
+Out of scope here: slide design (Canva/PPTX), pimatrix routing UI changes, storage admin (pistorage).
+
+## 4. LAN versus remote relay (least privilege)
+
+Roles come from the gateway listener, never from the browser (`ui-listener.ts`): LAN (3011, no PIN, `/api/` limited to 192.168.1.0/24 by nginx) and relay (3012 on 127.0.0.1, PIN, operate routes only, through the radio tunnel to `kehitys…/picontrol`).
+
+Proposal for piprogram routes:
+
+| Capability | LAN | Relay |
+|---|---|---|
+| Read pipelines, items, steps, thumbnails, frame | yes | yes |
+| Control (next, prev, goto, play, pause, stop, restart), FTB | yes | yes |
+| Playlist add/remove, basic image | yes | yes |
+| Audio kill, audio stop | yes | **yes** (safety action must work remotely) |
+| Audio arm and play, tts/prepare | yes | **no** (sound in the room should be an on-site decision) |
+| Add items (hymn, YouTube, media, PPTX), `use-at` | yes | no (uploads and downloads are heavy, YouTube fetch is outbound) |
+| Delete items | yes (`setup`) | no (`setup`) |
+| Config (`PUT .../config`) | yes (`setup`) | no |
+| Frame polling | yes | reduced rate, or off |
+
+Tell me if you want arm and play on the relay too. Mark the new rules in `UI_ROUTES` accordingly; the existing `setup` flag already gives the relay/LAN split. `frame.png` and thumbnails are binary: check the relay's size and rate limits and that cookies/PIN cover image requests.
+
+## 5. Work breakdown (separate PRs)
+
+1. **pigateway:** align `PiProgramClient` and routes with piprogram 1.0 (table in section 1), add the missing routes, extend `UI_ROUTES` per section 4, update the OpenAPI and tests. Also forward piprogram pipeline changes as the `pipgm` SSE event if it does not already.
+2. **picontrol UI:** new `renderer-tab.ts`, Phase A first, then B. Add `piprogram` to the default modules for LAN builds when it is verified (decision for Juha). Update `index.html` stub, `main.ts` header text.
+3. **picontrol CLI:** extend `pipgm` commands (control, ftb, audio arm, audio kill, items) and route through the gateway by default so the CLI works the same on LAN and via relay where allowed. Update docs and OpenAPI and `piecosystem` catalog (`docs/inter-service-matrix.md`) as piprogram asks.
+4. **piprogram:** none expected; maybe a pipeline change stream (SSE) if polling the gateway is too chatty.
+5. **Tests:** gateway route tests against a fake piprogram; picontrol tests for the CLI; UI checked against a mock API in headless Chromium (as for the other tabs). Nothing verified on the real Pi yet. piprogram is also "not started" in the on-site verification ledger, so a verification checklist is part of the work.
+
+## 6. Open questions
+
+1. Is the gateway talking to a piprogram 1.0 on the Pi already, or still to the pimatrix routes? (Decides whether step 1 is a fix or a migration.) The README says pimatrix still mounts the old routes until the Pi switches over.
+2. Arm and play audio from the relay: no (proposed) or yes?
+3. Should the tab also route a feed to Pi 1 / Pi 2 (one-tap "put this on the left projector"), or stay separate from Outputs?
+4. Live thumbnail via `frame.png` polling, or only step thumbnails? Chromium on the Pi must render frames (`PIPGM_CHROMIUM`), which costs CPU on a Pi 4 already near 84 °C under detection.
