@@ -2619,6 +2619,8 @@ window.adjustPtzSpeed = adjustPtzSpeed;
 // Authentication & MediaMTX Credentials UI Handlers
 // =========================================================================
 
+let uiPinSession = false;
+
 function updateAuthHeaderBadge(): void {
   const token = localStorage.getItem("pimatrix_auth_token");
   const authLabel = document.getElementById("top-auth-label");
@@ -2627,7 +2629,12 @@ function updateAuthHeaderBadge(): void {
 
   const isWhitelisted = window.__PIMATRIX_INITIAL__?.isWhitelisted;
 
-  if (isWhitelisted) {
+  if (uiPinSession) {
+    authLabel.textContent = "UNLOCKED · LOCK";
+    authIcon.textContent = "lock_open";
+    authIcon.classList.remove("text-error", "text-emerald-400");
+    authIcon.classList.add("text-primary");
+  } else if (isWhitelisted) {
     authLabel.textContent = "LAN PASS";
     authIcon.textContent = "verified_user";
     authIcon.classList.remove("text-error", "text-primary");
@@ -2695,7 +2702,30 @@ export function promptPinModal(base: string, mandatory = true): Promise<{ role: 
 
 registerPinPromptHandler(promptPinModal);
 
+/** The lock button: with a PIN session it locks at once (session ended on the gateway, PIN asked again). */
+export async function lockNow(): Promise<boolean> {
+  if (!activeUiBase) return false;
+  try {
+    const res = await fetch(`${activeUiBase}/ui/api/session`, { credentials: "include" });
+    if (!res.ok) return false;
+    await fetch(`${activeUiBase}/ui/api/logout`, { method: "POST", credentials: "include" });
+  } catch {
+    return false;
+  }
+  localStorage.removeItem("pimatrix_auth_token");
+  uiPinSession = false;
+  updateAuthHeaderBadge();
+  void promptPinModal(activeUiBase, true);
+  return true;
+}
+
 export function openAuthModal(): void {
+  void lockNow().then((locked) => {
+    if (!locked) openLegacyAuthModal();
+  });
+}
+
+function openLegacyAuthModal(): void {
   const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
   if (!modal) return;
 
@@ -2761,6 +2791,7 @@ export async function submitAuthPassword(): Promise<void> {
     const base = activeUiBase || "";
     let sessionRole = "lan";
     let loginOk = false;
+    let uiSessionOk = false;
 
     // 1. Authenticate with the UI listener session API
     try {
@@ -2772,6 +2803,7 @@ export async function submitAuthPassword(): Promise<void> {
       });
       if (loginRes.ok) {
         loginOk = true;
+        uiSessionOk = true;
         const body = (await loginRes.json()) as { role?: string };
         sessionRole = body.role || "lan";
       }
@@ -2794,11 +2826,13 @@ export async function submitAuthPassword(): Promise<void> {
     }
 
     if (loginOk) {
-      if (rememberCheck?.checked) {
+      // A PIN session lasts 24 h from the last activity; never keep the PIN itself (that would bypass the expiry).
+      if (rememberCheck?.checked && !uiSessionOk) {
         localStorage.setItem("pimatrix_auth_token", pin);
       } else {
         localStorage.removeItem("pimatrix_auth_token");
       }
+      if (uiSessionOk) uiPinSession = true;
       updateAuthHeaderBadge();
       isMandatoryAuth = false;
       const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
@@ -2884,6 +2918,7 @@ async function bootstrap(): Promise<void> {
   activeUiBase = uiBase;
   installCredentialedFetch(uiBase);
   const session = await ensureUiSession(uiBase);
+  uiPinSession = Boolean(uiBase && session);
   const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
   serverModules = await fetchServerModules(uiBase);
   applyModuleVisibility(serverModules, isOutsideLan);
