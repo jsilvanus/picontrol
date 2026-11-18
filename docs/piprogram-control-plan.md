@@ -25,7 +25,9 @@ The gateway client (`pigateway/src/pipgm/client.ts`) was written for the old pim
 | not proxied | `POST .../ftb`, `PUT .../basic-image`, `POST tts/prepare`, `GET .../frame.png`, `GET /pipgm/:id/stage`, items `hymn`, `youtube`, `media`, `pptx`, `GET assets/:id`, step `image.png` and `thumbnail.jpg` |
 | `POST items/:id/package` | `POST items/:id/canva/export-package` (the Canva path; the pigateway Canva routes may already use it, verify) |
 
-So step 1 of any UI work is aligning the gateway with piprogram 1.0 (or confirming it already runs against a piprogram that still serves the old paths).
+So step 1 of any UI work is aligning the gateway with piprogram 1.0.
+
+**Update 2026-11-18 (Pi discovery):** the Pi runs piprogram b8f17c1, which is the current main and serves `/control` (checked in the source at that commit), so it is 1.0. pimatrix no longer mounts `/api/v1/pipgm` (404). The Pi's pigateway (72dc7d0) predates the alignment, so pigateway must be deployed (from main only) before the new UI. The gateway's old `pipgm.hymn` and `pipgm.slide` rundown actions pointed at paths that exist nowhere and were removed; the replacement is `POST items/hymn {number}` followed by `POST pipelines/:id/playlist {itemId}` (and `control {gotoItem}` to show it). Mockups: https://claude.ai/artifact/2y7UTFbxr6KBiAYyCHnmhk
 
 ## 2. What piprogram can do (the control surface)
 
