@@ -185,3 +185,65 @@ Each piece is one repo, one area, 1 to 3 files, and has a test or a curl check a
 
 ### Order
 B1 and F1 to F4 first (first on-air screen), then B2 with F5 and F6, then B4 to B7 with G1, G2 and F7, then B8, F8 to F11, G3 and G4.
+
+## 9. Canva one-click "Go live" as an action list (added 2026-11-18)
+
+Request (Juha): after a Canva export reaches piprogram, the plugin offers Play options. For a vertical design the user picks left or right, feed (PiPGM 1, 2 or 3), output (Pi 1, 2 or 3), projector (1 or 2), fade to black or not, and presses Go live. One click should: save the set as a playlist, set it live on the chosen feed, route the feed to the chosen Pi output, route that output to the chosen projector, go live (with or without FTB), and open picontrol. The button saves an **action list** with a UUID, and the button is a link that executes the list.
+
+### Who owns action lists: pigateway (recommended)
+
+| Candidate | Verdict |
+|---|---|
+| **pigateway** | **Owner.** It already has the action registry and `POST /api/v1/actions/execute` (actors, results, events), the matrix and AMX route, ATEM, cameras, and the piprogram proxy. It has the LAN and relay listeners that decide who may run what, and the Canva-only listener the plugin already uses. A list is just a stored, ordered set of calls it can already make. |
+| piprogram | No. It must not know about HDMI or the matrix (project rule: piprogram makes feeds, pimatrix routes). It stays one step in the list. |
+| pirundown | Not the owner. It is a cue walker that already calls gateway actions. Later it can get a "run action list" action type so a service can trigger lists. |
+| new app | No. More ports, auth and deployment for something the gateway does in one module. |
+
+### Model
+`ActionList { id (uuid), name, createdBy ("canva"), createdAt, expiresAt, singleUse, steps: [{ action, params }], onError: "stop" }`. Steps are existing registry actions, so nothing new has to be invented per list. For the Canva example:
+1. `pipgm:playlist-set {feed, itemIds}`: save and set the playlist (also saved by name for reuse).
+2. `pipgm:route {feed, output}`: feed to Pi 1, 2 or 3 (today routed through pimatrix; piece A7 documents how).
+3. `matrix:route {input, output}`: Pi output to projector 1 or 2 (existing action).
+4. `pipgm:ftb {feed, on}`.
+5. `pipgm:control {feed, action: gotoItem|play}`.
+Then picontrol opens the feed focus view.
+
+### Access and safety
+- The Canva-only listener may **create** lists, but only from an allowlist of actions (pipgm steps, route to projector outputs 1 and 2, fade to black). It cannot create lists with camera, encoder, ATEM or setup steps.
+- **Run** is allowed on the LAN listener, and on the relay only if the list holds no projector or matrix step (proposal; the relay stays read and operate).
+- The link is a capability, so it must not run on a mere page load by a link prefetcher or another site. The link opens picontrol at `/run/<uuid>`, which runs at once only when opened on the LAN with a valid session, once (`singleUse`) and within 15 minutes; otherwise it shows the list summary and one Run button. Every run is logged with the list id.
+- Sound is separate: going live on a projector shows the picture; piprogram audio still needs to be armed.
+
+### Phases and pieces (Haiku-sized)
+
+**Phase 0, decisions (no code):** D1 left/right meaning, D2 auto-run rule, D3 relay may run lists or not (questions below).
+
+**Phase 1, action list core (pigateway):**
+- A1 Zod schema and file store for action lists (create, get, list, delete, expiry), with tests.
+- A2 Routes `POST/GET/DELETE /api/v1/action-lists[/:id]`; create validates steps against the allowlist for the Canva key. Tests.
+- A3 `POST /api/v1/action-lists/:id/run`: runs steps in order with the existing executor, per-step result, stops on error, single-use and expiry honoured, bus event per run. Tests.
+- A4 `UI_ROUTES` and Canva-listener entries per the access rules above. Test per rule.
+- A5 OpenAPI, README and CLI (`pigateway action-lists ...`).
+
+**Phase 2, new steps (pigateway, needs piprogram B2 and B4 to B7 for playlist set and save):**
+- A6 Registry actions `pipgm:playlist-set`, `pipgm:control`, `pipgm:ftb` calling the piprogram proxy. Tests.
+- A7 Read-only: document how a PiPGM feed is routed to Pi 1, 2 and 3 today (pimatrix or piswitch), then add the `pipgm:route` action on top.
+- A8 Preset wrapper "feed to projector" that expands to A7 plus `matrix:route`, so the plugin sends one small payload.
+
+**Phase 3, Canva plugin (canva-pieco-app):**
+- C1 After the export task is `ready`, enable a Play options panel for that item.
+- C2 Options form: left or right (vertical only), feed 1 to 3, Pi output 1 to 3, projector 1, 2 or none, fade to black checkbox.
+- C3 Go live: create the action list through the Canva listener, receive uuid and link, open the link in a new tab.
+- C4 Error states (list refused, gateway unreachable) with a plain next step.
+
+**Phase 4, picontrol:**
+- P1 Route `/run/<uuid>`: fetch the summary, show it, Run button, per-step progress, then open the feed focus view.
+- P2 Auto-run when on LAN with a session and the list is single-use and fresh; otherwise confirm.
+- P3 (later) Small "Action lists" screen: recent lists, re-run, delete.
+
+**Phase 5 (later):** pirundown action type `actionlist:run`.
+
+### Questions
+1. "Left or right" for vertical: is it the side of a side-by-side composite (the vertical-beside-video layout), or does it mean the left or right projector? If projector, it merges with the projector choice.
+2. Is one-tap with no confirm acceptable when opened on the church LAN (single-use, 15 minutes), with a confirm everywhere else?
+3. Should the relay (remote) be able to run lists that route a projector? I propose no.
