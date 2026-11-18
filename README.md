@@ -171,3 +171,8 @@ This project is an integral component of the [Pi Production Ecosystem](file:///d
 > [!IMPORTANT]
 > Any changes to this repository's architectural role, API routes, communication protocols, exposed ports, dependencies, or runtime status **must be documented in the central `piecosystem` coordination repository** (`docs/projects-catalog.md` and `docs/inter-service-matrix.md`).
 > Always verify cross-system health with `npm run status` in `D:\piecosystem`.
+
+
+## Outside the LAN
+
+`ui/.env.production` sets `VITE_RELAY_URL` (the public relay, `https://kehitys.riihimaenseurakunta.fi/picontrol`). The UI first probes the LAN backend on its own origin; a 403 or no answer (nginx allows `/api` and `/ui/api` only from the LAN) switches it to the relay, which asks for the PIN (24 h sliding session). The relay's `PIGATEWAY_UI_CORS_ORIGINS` must list the UI origin. Rebuild the UI (`pnpm run build:ui`) and copy `ui/dist` to the web root for the change to take effect.
