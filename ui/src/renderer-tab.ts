@@ -546,7 +546,9 @@ function onClick(event: Event): void {
       void act(() => client.audioKill(), (items) => { pipelines = items.filter((p) => !p.hidden); notice = "Audio killed on every feed."; setTimeout(() => { notice = ""; render(); }, 4000); });
       break;
     case "kill-feed":
-      if (id) void act(async () => { await client.audioDisarm(id); return client.audioStop(id); }, applyPipeline);
+      if (id) void act(async () => { const stopped = await client.audioStop(id);
+        // Disarming is a LAN-only route; from outside the stop above is what counts, so a refusal is not an error.
+        try { return await client.audioDisarm(id); } catch { return stopped; } }, applyPipeline);
       break;
     case "dismiss-banner": banner = null; render(); break;
     case "view": goto({ name: target.dataset.view as "operate" | "monitor" | "library" }); break;
