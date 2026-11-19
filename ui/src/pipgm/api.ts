@@ -107,6 +107,8 @@ export function createPipgmClient(options: ClientOptions) {
     prepareItem: (itemId: string, orientation: string) => call<unknown>("POST", `/items/${enc(itemId)}/prepare?orientation=${orientation}`, {}),
     addHymn: (title: string, hymnNumber: string, rawText: string) =>
       call<LibraryItem>("POST", "/items/hymn", { title, ...(hymnNumber ? { hymnNumber } : {}), rawText }),
+    setUseAt: (itemId: string, useAt: string) =>
+      call<LibraryItem>("PUT", `/items/${encodeURIComponent(itemId)}/use-at`, { useAt }),
     addYoutube: (urlOrId: string, title?: string) =>
       call<LibraryItem>("POST", "/items/youtube", { urlOrId, ...(title ? { title } : {}) }),
 
