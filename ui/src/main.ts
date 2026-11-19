@@ -549,6 +549,11 @@ function getEffectiveOutputSource(outputNum: 1 | 2): string {
   return outputNum === 1 ? "PiPGM1" : "rtmp1";
 }
 
+/** Cameras and RTMP inputs that are not delivering a picture: routing them waits ~30 s and fails, so they are greyed out. */
+function isSourceOffline(src: string): boolean {
+  return /^(cam\d+|rtmp\d+)$/.test(src) && sourcesMap.get(src)?.state === "unavailable";
+}
+
 function isSourceFtb(sourceId: string): boolean {
   if (!sourceId || sourceId === "multiview") return false;
   const fx = effectsMap.get(sourceId);
@@ -608,7 +613,10 @@ function buildInputRowWithInlineControls(
   // compose1 is a slide-only key page: no video or audio, so no mute/FTB; hold opens the Composite tab.
   const isCompose = src === "compose1";
 
-  const rowBg = isSelected
+  const offline = !isSelected && isSourceOffline(src);
+  const rowBg = offline
+    ? "bg-surface-container-low text-on-surface-variant border-outline-variant/15 opacity-50"
+    : isSelected
     ? "bg-primary text-on-primary shadow-sm border-primary"
     : "bg-surface-container-high hover:bg-surface-container-highest text-on-surface border-outline-variant/25 shadow-xs";
 
@@ -635,12 +643,14 @@ function buildInputRowWithInlineControls(
         data-crop-source="${src}"
         onclick="${selectCall}"
         oncontextmenu="event.preventDefault(); openSourceCropModal('${src}')"
-        title="Tap to route ${label.toUpperCase()} • Hold to open Cropper"
+        ${offline ? "disabled" : ""}
+        title="${offline ? `${label.toUpperCase()} is offline (no picture)` : `Tap to route ${label.toUpperCase()} • Hold to open Cropper`}"
         class="hdmi${outputNum}-btn flex-1 h-full px-1.5 rounded-md font-label-md text-[11px] uppercase ${isSelected ? "font-bold" : "font-semibold"} text-left flex items-center justify-between min-w-0 active:scale-[0.98] transition-all"
       >
         <span class="truncate flex items-center gap-1">
           ${isSelected ? '<span class="material-symbols-outlined text-[12px]">radio_button_checked</span>' : ""}
           <span>${label}</span>
+          ${offline ? '<span class="text-[8px] font-bold normal-case opacity-80">offline</span>' : ""}
         </span>
         <span class="flex items-center gap-1 flex-shrink-0">${cropBadgeHtml}</span>
       </button>
@@ -2411,6 +2421,21 @@ async function fetchInitialFromApiIfNeeded(): Promise<void> {
 }
 
 /** Re-reads outputs and effects after the backend changed them (a quick option was applied). */
+async function pollSourceStates(): Promise<void> {
+  if (document.hidden) return;
+  try {
+    const res = await fetch("/api/v1/sources?includeHidden=true");
+    if (!res.ok) return;
+    const data = (await res.json()) as { items: SourceItem[] };
+    let changed = false;
+    for (const s of data.items) {
+      if (sourcesMap.get(s.id)?.state !== s.state) changed = true;
+      sourcesMap.set(s.id, s);
+    }
+    if (changed && activeTab === "outputs") renderOutputsTab();
+  } catch { /* keep the last known states */ }
+}
+
 async function refreshOutputsState(): Promise<void> {
   const [outRes, fxRes] = await Promise.all([
     fetch("/api/v1/outputs").catch(() => null),
@@ -2442,6 +2467,8 @@ function startRelayHeartbeat(): void {
   };
   void beat();
   window.setInterval(() => void beat(), 15000);
+  // Source states (live / unavailable) drive the greyed-out offline inputs; re-render only when one changes.
+  window.setInterval(() => void pollSourceStates(), 5000);
 }
 
 function connectSse(): void {
