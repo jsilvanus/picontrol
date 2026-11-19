@@ -1,0 +1,10 @@
+[Unit]
+Description=PiControl UI (static files plus /voice proxy to pivoice)
+
+[Service]
+Environment=PIVOICE_URL=http://127.0.0.1:3106
+ExecStart=%h/.local/bin/node %h/apps/bin/picontrol-ui-server.mjs
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
