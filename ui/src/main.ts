@@ -10,6 +10,7 @@ import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
 import { resolveApiUrl, resolveGatewayBaseUrl, setRuntimeGatewayBase } from "./config";
+import { currentRunId, openRunPage } from "./run-page";
 import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
@@ -3026,6 +3027,9 @@ async function bootstrap(): Promise<void> {
   renderMatrixTab();
   renderCamerasTab();
   connectSse();
+  // A link from the Canva "Go live" button: /run/<id> shows or runs the saved action list.
+  const runId = currentRunId();
+  if (runId) void openRunPage(runId, isOutsideLan, () => switchTab("renderer"));
 }
 
 void bootstrap();

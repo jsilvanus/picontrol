@@ -141,3 +141,26 @@ test("poller uses the interval from the data and backs off on error", async () =
   assert.deepEqual(seen, [1, "err"]);
   assert.deepEqual(delays, [1000, 5000]);
 });
+
+import { runIdFromPath, shouldAutoRun, blockedOnRelay, describeStep, whyNotRunnable } from "../ui/src/run-logic.ts";
+
+test("run page: id from the path, auto-run only on the LAN for a fresh single-use list", () => {
+  const id = "11111111-2222-3333-4444-555555555555";
+  assert.equal(runIdFromPath(`/run/${id}`), id);
+  assert.equal(runIdFromPath(`/picontrol/run/${id}/`), id);
+  assert.equal(runIdFromPath("/run/nope"), null);
+  assert.equal(runIdFromPath("/"), null);
+  assert.equal(shouldAutoRun({ state: "ready", singleUse: true }, false), true);
+  assert.equal(shouldAutoRun({ state: "ready", singleUse: true }, true), false);
+  assert.equal(shouldAutoRun({ state: "ready", singleUse: false }, false), false);
+  assert.equal(shouldAutoRun({ state: "used", singleUse: true }, false), false);
+  assert.equal(shouldAutoRun({ state: "expired", singleUse: true }, false), false);
+  assert.equal(blockedOnRelay({ routesProjector: true }, true), true);
+  assert.equal(blockedOnRelay({ routesProjector: true }, false), false);
+  assert.equal(blockedOnRelay({ routesProjector: false }, true), false);
+  assert.equal(whyNotRunnable({ state: "ready" }), null);
+  assert.match(whyNotRunnable({ state: "expired" }), /expired/);
+  assert.match(whyNotRunnable({ state: "used" }), /already/);
+  assert.equal(describeStep({ action: "matrix:route", params: { input: 3, output: 2 } }), "Send Pi input 3 to the right projector");
+  assert.equal(describeStep({ action: "pipgm:ftb", params: { feed: "PiPGM1", on: false } }), "Show the picture of PiPGM1");
+});
