@@ -309,9 +309,11 @@ function renderStrip(id: FeedId, p: Pipeline): string {
 function renderEditor(id: FeedId, p: Pipeline): string {
   const draft = draftOf(id);
   const dirty = isDirty(id);
-  const rows = draft.map((itemId, i) => {
+  const rows = draft.map((draftId, i) => {
+    const entry = p.playlist.find((e) => e.entryId === draftId);
+    const itemId = entry?.id ?? draftId;
     const item = itemById(itemId);
-    const live = p.activeItemId === itemId;
+    const live = entry ? p.activeEntryId === draftId || (p.activeEntryId == null && p.activeItemId === itemId) : false;
     return `<li draggable="true" data-drag="${i}" class="flex items-center gap-2 p-2 rounded-lg bg-surface-container border ${live ? "border-primary" : "border-outline-variant/30"}">
       <span class="material-symbols-outlined text-on-surface-variant cursor-grab">drag_indicator</span>
       <span class="material-symbols-outlined text-[18px] text-on-surface-variant">${KIND_ICON[item?.kind ?? ""] ?? "article"}</span>
@@ -321,7 +323,7 @@ function renderEditor(id: FeedId, p: Pipeline): string {
       <button type="button" data-action="remove-draft" data-index="${i}" class="p-1 text-error" aria-label="Remove"><span class="material-symbols-outlined text-[18px]">close</span></button>
     </li>`;
   }).join("");
-  const addable = (library ?? []).filter((i) => i.kind !== "audio" && !draft.includes(i.id));
+  const addable = (library ?? []).filter((i) => i.kind !== "audio");
   return `<div class="flex flex-col gap-2">
     <ul class="flex flex-col gap-1.5" data-droplist>${rows || `<li class="text-on-surface-variant font-body-sm">Empty. Add items from the library.</li>`}</ul>
     <div class="flex gap-2 flex-wrap items-center">

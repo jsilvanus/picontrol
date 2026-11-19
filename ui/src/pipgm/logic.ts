@@ -69,18 +69,21 @@ export function removeAt<T>(list: readonly T[], index: number): T[] {
   return list.filter((_, i) => i !== index);
 }
 
-/** The draft starts as the ids of what the feed plays now. */
+/** The draft starts as the entry ids of what the feed plays now (an item id when an entry has none). */
 export function draftFromPipeline(p: Pick<Pipeline, "playlist">): string[] {
-  return p.playlist.map((i) => i.id);
+  return p.playlist.map((i) => i.entryId ?? i.id);
 }
 
 export function sameIds(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
-/** Items are unique in a live playlist (the service answers 422 for a duplicate), so a copy is not offered there. */
+/**
+ * The same item may be listed several times: a draft id is an entry id (an existing copy) or a
+ * library item id (a new copy), and the service makes a new entry for every item id it meets.
+ */
 export function addUnique(list: readonly string[], id: string): string[] {
-  return list.includes(id) ? [...list] : [...list, id];
+  return [...list, id];
 }
 
 // ---- saved playlist documents ---------------------------------------------
