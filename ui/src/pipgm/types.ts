@@ -18,6 +18,8 @@ export interface StepDescriptor {
 
 export interface LibraryItem {
   id: string;
+  /** Set on a playlist entry: the same item can be listed several times. */
+  entryId?: string;
   title: string;
   kind: ItemKind;
   createdAt?: string;
@@ -40,6 +42,7 @@ export interface Pipeline {
   volume: number;
   audioTrack: { title: string } | null;
   activeItemId: string | null;
+  activeEntryId?: string | null;
   activeItemIndex: number;
   currentStep: number;
   totalSteps: number;
@@ -52,6 +55,7 @@ export interface Pipeline {
 
 export interface StepRow {
   itemId: string;
+  entryId?: string | null;
   itemIndex: number;
   itemTitle: string;
   itemKind: ItemKind | string;

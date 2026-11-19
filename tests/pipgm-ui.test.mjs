@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  groupSteps, comingUp, pollIntervalMs, armSecondsLeft, formatCountdown, moveEntry, removeAt, addUnique,
+  groupSteps, comingUp, pollIntervalMs, armSecondsLeft, formatCountdown, moveEntry, removeAt, addUnique, draftFromPipeline,
   parsePlaylistDocument, describeLoadReport, filterLibrary, useAtMatchesDay, adviceFor, toDocument
 } from "../ui/src/pipgm/logic.ts";
 import { createPipgmClient, createPoller, PipgmError } from "../ui/src/pipgm/api.ts";
@@ -39,8 +39,13 @@ test("draft edits", () => {
   assert.deepEqual(moveEntry(["a", "b", "c"], 0, 2), ["b", "c", "a"]);
   assert.deepEqual(moveEntry(["a", "b"], 5, 0), ["a", "b"]);
   assert.deepEqual(removeAt(["a", "b", "c"], 1), ["a", "c"]);
-  assert.deepEqual(addUnique(["a"], "a"), ["a"]);
+  assert.deepEqual(addUnique(["a"], "a"), ["a", "a"]);
   assert.deepEqual(addUnique(["a"], "b"), ["a", "b"]);
+});
+
+test("a draft keeps the entry id of each copy so the same item can repeat", () => {
+  const p = { playlist: [{ id: "i1", entryId: "e1" }, { id: "i1", entryId: "e2" }, { id: "i2" }] };
+  assert.deepEqual(draftFromPipeline(p), ["e1", "e2", "i2"]);
 });
 
 test("playlist document import is validated", () => {
