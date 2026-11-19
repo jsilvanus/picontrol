@@ -550,6 +550,9 @@ function getEffectiveOutputSource(outputNum: 1 | 2): string {
 }
 
 /** Cameras and RTMP inputs that are not delivering a picture: routing them waits ~30 s and fails, so they are greyed out. */
+/** Output/source pairs ("1:rtmp1") whose route request is still in flight; their row flashes until the toast. */
+const routingPending = new Set<string>();
+
 function isSourceOffline(src: string): boolean {
   return /^(cam\d+|rtmp\d+)$/.test(src) && sourcesMap.get(src)?.state === "unavailable";
 }
@@ -614,7 +617,10 @@ function buildInputRowWithInlineControls(
   const isCompose = src === "compose1";
 
   const offline = !isSelected && isSourceOffline(src);
-  const rowBg = offline
+  const routing = routingPending.has(`${outputNum}:${src}`);
+  const rowBg = routing
+    ? "bg-primary/30 text-on-surface border-primary animate-pulse"
+    : offline
     ? "bg-surface-container-low text-on-surface-variant border-outline-variant/15 opacity-50"
     : isSelected
     ? "bg-primary text-on-primary shadow-sm border-primary"
@@ -836,6 +842,12 @@ function renderRoutedToBadges(): void {
 
 async function selectHdmiSource(outputNum: 1 | 2, sourceId: string | null): Promise<void> {
   const outputId = outputNum === 1 ? "hdmi0" : "hdmi1";
+  const pendingKey = sourceId ? `${outputNum}:${sourceId}` : "";
+  if (pendingKey) {
+    if (routingPending.has(pendingKey)) return;
+    routingPending.add(pendingKey);
+    renderOutputsTab();
+  }
   try {
     const res = await fetch(`/api/v1/outputs/${outputId}/source`, {
       method: "POST",
@@ -853,6 +865,11 @@ async function selectHdmiSource(outputNum: 1 | 2, sourceId: string | null): Prom
     }
   } catch {
     showToast(`Failed to route Pi ${outputNum}`);
+  } finally {
+    if (pendingKey) {
+      routingPending.delete(pendingKey);
+      renderOutputsTab();
+    }
   }
 }
 
