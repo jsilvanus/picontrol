@@ -33,7 +33,9 @@ let saved: PlaylistSummary[] | null = null;
 let banner: { title: string; next: string } | null = null;
 let notice = "";
 let loadReport: { feed: FeedId; report: LoadReport } | null = null;
-let dialog: "generate" | "save" | null = null;
+let dialog: "generate" | "save" | "permanent" | null = null;
+/** An add waiting for the "is this a permanent asset?" answer (no use date was given). */
+let pendingAdd: (() => void) | null = null;
 let generateState: { date: string; busy: boolean; draftName: string; items: string[]; missing: number } | null = null;
 let libFilter = { kind: "", day: "", text: "", target: "PiPGM1" as FeedId };
 let panelOpen: { editor: boolean; saved: boolean } = { editor: true, saved: false };
@@ -428,6 +430,8 @@ function renderLibrary(): string {
     <section class="rounded-xl bg-surface-container-low border border-outline-variant/40 p-3 flex flex-col gap-2">
       <div class="font-label-md font-bold uppercase">Add content <span class="font-normal normal-case text-on-surface-variant">(church network only)</span></div>
       <div class="flex gap-2 flex-wrap items-center">
+        <input data-new="use-at" placeholder="Use date (optional), e.g. 2026-11-22" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm w-full">
+        <div class="font-label-sm text-[11px] text-on-surface-variant w-full">Without a date the item is kept as a permanent asset.</div>
         <input data-new="youtube" placeholder="YouTube link" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm flex-1 min-w-[12rem]">
         <button type="button" data-action="add-youtube" class="h-10 px-3 rounded-lg bg-surface-container-highest font-label-md">Add video</button>
       </div>
@@ -442,6 +446,10 @@ function renderLibrary(): string {
 }
 
 function renderDialog(): string {
+  if (dialog === "permanent") {
+    return modal("Permanent asset?", `<div class="font-body-md">No use date was given. Add this as a permanent asset that stays in the library until you delete it?</div>`,
+      `<button type="button" data-action="confirm-permanent" class="h-10 px-4 rounded-lg bg-primary text-on-primary font-label-md font-bold">Yes, permanent</button>`);
+  }
   if (dialog === "save" && view.name === "feed") {
     const p = feed(view.id);
     return modal("Save playlist", `<input data-save-name class="h-10 w-full px-3 rounded-lg bg-surface-container-highest font-body-md" placeholder="Name" value="${esc(p ? `${FEED_LABEL[p.id]} ${new Date().toLocaleDateString("fi-FI")}` : "")}">
@@ -603,7 +611,8 @@ function onClick(event: Event): void {
     // saved playlists
     case "open-save": dialog = "save"; render(); break;
     case "open-generate": dialog = "generate"; generateState = null; void ensureLibrary(); render(); break;
-    case "close-dialog": dialog = null; render(); break;
+    case "close-dialog": dialog = null; pendingAdd = null; render(); break;
+    case "confirm-permanent": { const run = pendingAdd; dialog = null; pendingAdd = null; render(); run?.(); break; }
     case "save-confirm": {
       const name = root?.querySelector<HTMLInputElement>("[data-save-name]")?.value.trim();
       if (!id || !name) break;
@@ -662,18 +671,28 @@ function onClick(event: Event): void {
     case "add-youtube": {
       const input = root?.querySelector<HTMLInputElement>("[data-new=youtube]");
       const v = input?.value.trim();
-      if (v) void act(() => client.addYoutube(v), () => { if (input) input.value = ""; void ensureLibrary(true); });
+      if (v) withUseDate((useAt) => void act(async () => { const it = await client.addYoutube(v); if (useAt) await client.setUseAt(it.id, useAt); return it; }, () => { if (input) input.value = ""; void ensureLibrary(true); }));
       break;
     }
     case "add-hymn": {
       const q = (n: string) => root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-new=${n}]`);
       const title = q("hymn-title")?.value.trim() || (q("hymn-number")?.value.trim() ? `Virsi ${q("hymn-number")?.value.trim()}` : "");
       const text = q("hymn-text")?.value.trim() ?? "";
+      const number = q("hymn-number")?.value.trim() ?? "";
       if (!title || !text) { banner = { title: "Hymn needs a title and text", next: "Fill in the title (or number) and paste the stanzas." }; render(); break; }
-      void act(() => client.addHymn(title, q("hymn-number")?.value.trim() ?? "", text), () => { ["hymn-number", "hymn-title", "hymn-text"].forEach((n) => { const e = q(n); if (e) e.value = ""; }); void ensureLibrary(true); });
+      withUseDate((useAt) => void act(async () => { const it = await client.addHymn(title, number, text); if (useAt) await client.setUseAt(it.id, useAt); return it; }, () => { ["hymn-number", "hymn-title", "hymn-text"].forEach((n) => { const e = q(n); if (e) e.value = ""; }); void ensureLibrary(true); }));
       break;
     }
   }
+}
+
+/** Runs an add with its optional use date; with no date, asks first whether it is a permanent asset. */
+function withUseDate(run: (useAt: string) => void): void {
+  const useAt = root?.querySelector<HTMLInputElement>("[data-new=use-at]")?.value.trim() ?? "";
+  if (useAt) { run(useAt); return; }
+  pendingAdd = () => run("");
+  dialog = "permanent";
+  render();
 }
 
 function onChange(event: Event): void {
