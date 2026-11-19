@@ -549,12 +549,12 @@ function getEffectiveOutputSource(outputNum: 1 | 2): string {
   return outputNum === 1 ? "PiPGM1" : "rtmp1";
 }
 
-/** Cameras and RTMP inputs that are not delivering a picture: routing them waits ~30 s and fails, so they are greyed out. */
+/** Cameras, RTMP and PiPGM inputs that are not delivering a picture: routing them waits ~30 s and fails, so they are greyed out. */
 /** Output/source pairs ("1:rtmp1") whose route request is still in flight; their row flashes until the toast. */
 const routingPending = new Set<string>();
 
 function isSourceOffline(src: string): boolean {
-  return /^(cam\d+|rtmp\d+)$/.test(src) && sourcesMap.get(src)?.state === "unavailable";
+  return /^(cam\d+|rtmp\d+|PiPGM\d+)$/.test(src) && sourcesMap.get(src)?.state === "unavailable";
 }
 
 function isSourceFtb(sourceId: string): boolean {
