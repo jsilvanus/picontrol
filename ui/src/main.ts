@@ -827,7 +827,7 @@ async function selectHdmiSource(outputNum: 1 | 2, sourceId: string | null): Prom
   const outputId = outputNum === 1 ? "hdmi0" : "hdmi1";
   try {
     const res = await fetch(`/api/v1/outputs/${outputId}/source`, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourceId })
     });
@@ -837,6 +837,8 @@ async function selectHdmiSource(outputNum: 1 | 2, sourceId: string | null): Prom
       renderOutputsTab();
       const label = sourceId ? SOURCE_LABELS[sourceId] || sourceId : "Cleared";
       showToast(`Pi ${outputNum} (hdmi ${outputNum - 1}) → ${label.toUpperCase()}`);
+    } else {
+      showToast(`Routing Pi ${outputNum} failed (${res.status})`);
     }
   } catch {
     showToast(`Failed to route Pi ${outputNum}`);
@@ -868,7 +870,7 @@ async function confirmAuxPick(
   if (sourceId === "multiview" && mvLayout) {
     try {
       const mvRes = await fetch("/api/v1/outputs/multiview/layout", {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ layout: mvLayout })
       });
@@ -1239,7 +1241,7 @@ function bindCropInteractiveDrag(): void {
     const fx = ensureSourceEffects(sourceId);
     try {
       const res = await fetch(`/api/v1/sources/${encodeURIComponent(sourceId)}/effects/crop`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: true,
@@ -1326,7 +1328,7 @@ async function toggleSourceCropLockAspect(): Promise<void> {
   const nextLocked = !fx.crop.lockedAspectRatio;
   try {
     const res = await fetch(`/api/v1/sources/${encodeURIComponent(sourceId)}/effects/crop`, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lockedAspectRatio: nextLocked })
     });
@@ -1463,7 +1465,7 @@ function renderRtspSection(): void {
 async function assignRtsp(sourceId: string, mvLayout?: "landscape" | "portrait"): Promise<void> {
   try {
     const res = await fetch("/api/v1/outputs/rtsp/source", {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sourceId,
@@ -1485,7 +1487,7 @@ async function setRtspQualityProfile(quality: "preview" | "full"): Promise<void>
   const bitrateKbps = quality === "preview" ? 800 : 6200;
   try {
     const res = await fetch("/api/v1/outputs/rtsp/source", {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sourceId: rtspOut.sourceId,
@@ -1517,7 +1519,7 @@ async function updateRtspCustomQuality(): Promise<void> {
 
   try {
     const res = await fetch("/api/v1/outputs/rtsp/source", {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sourceId: rtspOut.sourceId,
