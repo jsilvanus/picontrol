@@ -205,8 +205,8 @@ function renderKillBar(): string {
     return `<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 font-label-sm text-[10px] font-bold uppercase">${FEED_LABEL[p.id]} ${left ? formatCountdown(left) : "playing"}</span>`;
   }).join("");
   return `<div class="flex items-center gap-3 flex-wrap">
-    <button type="button" data-action="kill-audio" class="inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-error text-on-error font-label-md font-bold uppercase shadow-sm active:scale-95">
-      <span class="material-symbols-outlined text-[20px]">volume_off</span> Kill audio
+    <button type="button" data-action="kill-audio" title="Kill audio on every feed" aria-label="Kill audio on every feed" class="w-6 h-6 rounded flex items-center justify-center transition-all active:scale-90 bg-error/15 text-error hover:bg-error/25">
+      <span class="material-symbols-outlined text-[13px]">volume_off</span>
     </button>
     <div class="flex gap-1.5 flex-wrap text-on-surface-variant font-label-sm text-[11px]">${armed.length ? chips : "Sound is off on every feed"}</div>
   </div>`;
@@ -238,7 +238,7 @@ function renderFeedCard(p: Pipeline): string {
   return `<div class="p-3 rounded-xl bg-surface-container-low border border-outline-variant/40 flex flex-col gap-2" data-feed-card="${p.id}">
     <div class="flex items-center justify-between gap-2">
       <button type="button" data-action="open-feed" data-feed="${p.id}" class="font-headline-sm text-[16px] font-bold text-on-surface text-left">${FEED_LABEL[p.id]}</button>
-      ${stateBadge(p)}
+      <div class="flex items-center gap-1.5">${stateBadge(p)}<button type="button" data-action="kill-feed" data-feed="${p.id}" title="Kill audio on this feed" aria-label="Kill audio on this feed" class="w-6 h-6 rounded flex items-center justify-center transition-all active:scale-90 ${p.audioTrack || armSecondsLeft(p) > 0 ? "bg-error text-on-error" : "bg-surface-container hover:bg-surface-container-lowest text-on-surface-variant"}"><span class="material-symbols-outlined text-[13px]">volume_off</span></button></div>
     </div>
     <button type="button" data-action="open-feed" data-feed="${p.id}" class="block text-left">${frameImg(p, "w-full rounded-md", 480)}</button>
     <div class="min-h-[2.5rem]">
@@ -544,6 +544,9 @@ function onClick(event: Event): void {
   switch (action) {
     case "kill-audio":
       void act(() => client.audioKill(), (items) => { pipelines = items.filter((p) => !p.hidden); notice = "Audio killed on every feed."; setTimeout(() => { notice = ""; render(); }, 4000); });
+      break;
+    case "kill-feed":
+      if (id) void act(async () => { await client.audioDisarm(id); return client.audioStop(id); }, applyPipeline);
       break;
     case "dismiss-banner": banner = null; render(); break;
     case "view": goto({ name: target.dataset.view as "operate" | "monitor" | "library" }); break;
