@@ -23,6 +23,71 @@ export interface EcosystemStatus {
   components: Record<string, EcosystemComponent>;
 }
 
+export interface FpsContributor {
+  id: string;
+  label: string;
+  kind: "capture" | "feed" | "composite" | "effects" | "output";
+  encodeFps: number;
+  decodeFps: number;
+  detail?: string;
+}
+
+export interface FpsBudget {
+  budgetFps: number;
+  encodeFps: number;
+  decodeFps: number;
+  totalFps: number;
+  encodePercent: number;
+  decodePercent: number;
+  contributors: FpsContributor[];
+}
+
+export interface SystemHostMetrics {
+  cpuUsagePercent: number;
+  cpuCores: number;
+  loadAvg: number[];
+  memory: {
+    totalBytes: number;
+    freeBytes: number;
+    usedBytes: number;
+    usedPercent: number;
+    processRssBytes: number;
+  };
+  uptimeSeconds: number;
+}
+
+export interface FleetWorkerInfo {
+  id: string;
+  status: "online" | "offline" | "unknown";
+  slots?: Record<string, unknown>;
+  activeJobs?: number;
+  capabilities?: string[];
+  lastSeenAt?: string;
+}
+
+export interface SystemTelemetryResponse {
+  service: string;
+  mode?: string;
+  timestamp: string;
+  gateway?: SystemHostMetrics;
+  pimatrix?: {
+    fps?: FpsBudget;
+    system?: SystemHostMetrics;
+    fffleet?: { status: string; workers: FleetWorkerInfo[] };
+    mediaMtx?: { status: string; readyPaths?: string[] };
+  } | null;
+  fps?: FpsBudget | null;
+  system?: SystemHostMetrics | null;
+  fffleet?: { status: string; workers: FleetWorkerInfo[] } | null;
+  mediaMtx?: { status: string; readyPaths?: string[] } | null;
+  connections?: {
+    atem?: { configured: boolean; connected: boolean };
+    encoder?: { configured: boolean; connected: boolean };
+    cameras?: Array<{ id: string; connection: string }>;
+  };
+  ecosystem?: EcosystemStatus;
+}
+
 export type SourceId =
   | "hama"
   // NOTE: Future `hama2` virtual/duplicate source will be added here so we can send
