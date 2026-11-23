@@ -1,5 +1,5 @@
 // Pure helpers for the typed library in the piprogram tab: query strings, recording support, file reading.
-import type { ActiveReason, LibraryQuery } from "./types.ts";
+import type { ActiveReason, LibraryItem, LibraryQuery } from "./types.ts";
 
 /** Browser upload limit before base64 (the service accepts a 50 MB request body; base64 adds a third). */
 export const MAX_SOUND_BYTES = 30 * 1024 * 1024;
@@ -17,6 +17,7 @@ export function typeLabel(type: string | undefined): string {
 export function itemsQueryString(q: LibraryQuery): string {
   const p = new URLSearchParams();
   if (q.type?.length) p.set("type", q.type.join(","));
+  if (q.hymnal?.length) p.set("hymnal", q.hymnal.join(","));
   if (q.q?.trim()) p.set("q", q.q.trim());
   if (q.unscheduled) p.set("unscheduled", "true");
   else {
@@ -124,4 +125,52 @@ export function reasonLabel(reason: ActiveReason): string {
 /** A date-only entry cannot be removed by hand: it leaves when its use date passes or changes. */
 export function canRemoveFromActive(reason: ActiveReason): boolean {
   return reason !== "date";
+}
+
+/** The hymnal prefix of a hymn number: "LV 12" -> LV; a bare number is the Virsikirja (VK). */
+export function hymnalPrefixOf(hymnNumber: string | undefined): string {
+  const m = /^\s*([A-Za-zÅÄÖåäö]{1,6})[\s.\-:]*\d/.exec(hymnNumber ?? "");
+  return m?.[1] ? m[1].toUpperCase() : "VK";
+}
+
+/** What to send as the number of a new hymn: the picked hymnal's prefix, unless the user typed one or it is the Virsikirja. */
+export function composeHymnNumber(prefix: string, typed: string): string {
+  const number = typed.trim();
+  if (!number || /^[A-Za-zÅÄÖåäö]/.test(number)) return number;
+  return !prefix || prefix === "VK" ? number : `${prefix} ${number}`;
+}
+
+export type Preview =
+  | { kind: "audio" | "image" | "video"; url: string; mime?: string }
+  | { kind: "hymn"; stanzas: Array<{ number: string; text: string }> }
+  | { kind: "youtube"; url?: string }
+  | { kind: "steps"; count: number }
+  | { kind: "none" };
+
+/** What the card shows for an item. `assetUrl` is the service path (/api/v1/pipgm/assets/...); `resolve` makes it loadable. */
+export function previewOf(item: LibraryItem, resolve: (path: string) => string): Preview {
+  const asset = (path: string | undefined): string | undefined => (path ? resolve(path) : undefined);
+  if (item.kind === "audio" && item.audio?.assetUrl) return { kind: "audio", url: asset(item.audio.assetUrl)!, ...(item.audio.mimeType ? { mime: item.audio.mimeType } : {}) };
+  if (item.kind === "image" && item.image?.assetUrl) return { kind: "image", url: asset(item.image.assetUrl)! };
+  if (item.kind === "video" && item.video?.assetUrl) return { kind: "video", url: asset(item.video.assetUrl)!, ...(item.video.mimeType ? { mime: item.video.mimeType } : {}) };
+  if (item.kind === "hymn" && item.hymn?.stanzas?.length) {
+    return { kind: "hymn", stanzas: item.hymn.stanzas.map((s) => ({ number: s.stanzaNumber, text: s.lines.join("\n") })) };
+  }
+  if (item.kind === "youtube") return { kind: "youtube", ...(item.youtube?.url ? { url: item.youtube.url } : {}) };
+  if ((item.steps?.length ?? 0) > 0) return { kind: "steps", count: item.steps!.length };
+  return { kind: "none" };
+}
+
+/** "Uploaded", "Recorded" or "Created": how the item came to the library. */
+export function originLabel(item: LibraryItem): string {
+  if (item.kind === "audio") return item.audio?.origin === "recording" ? "Recorded" : item.audio?.origin === "tts" ? "Created" : "Uploaded";
+  return item.kind === "hymn" ? "Created" : "Uploaded";
+}
+
+/** "23.11.2026 14.32" in the browser's time zone; empty when the time is missing or not a date. */
+export function formatStamp(iso: string | undefined, locale = "fi-FI"): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.toLocaleDateString(locale)} ${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
 }

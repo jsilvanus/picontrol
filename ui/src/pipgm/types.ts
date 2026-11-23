@@ -25,10 +25,13 @@ export interface LibraryItem {
   /** Library type (sound, tts, hymn, song, image, video, slides, canva or a custom name). */
   type?: string;
   createdAt?: string;
-  audio?: { origin?: string; durationMs?: number };
+  audio?: { origin?: string; durationMs?: number; filename?: string; mimeType?: string; assetUrl?: string };
+  image?: { filename?: string; mimeType?: string; assetUrl?: string; caption?: string };
+  video?: { filename?: string; mimeType?: string; assetUrl?: string; durationMs?: number };
+  youtube?: { videoId?: string; url?: string };
   useAt?: string[];
   steps?: StepDescriptor[];
-  hymn?: { hymnNumber: string; title: string };
+  hymn?: { hymnNumber: string; title: string; stanzas?: Array<{ stanzaNumber: string; lines: string[]; refrain?: boolean }> };
   canva?: { exportJob?: { status?: string; error?: string | null } };
 }
 
@@ -134,6 +137,8 @@ export interface LibraryStorage {
 
 export interface LibraryQuery {
   type?: string[];
+  /** Hymnal prefixes (VK, LV, ...). */
+  hymnal?: string[];
   q?: string;
   usedFrom?: string;
   usedTo?: string;
@@ -149,6 +154,15 @@ export interface LibraryPage {
   /** Matches per type before the type filter, for the filter chips. */
   types: Array<{ type: string; count: number }>;
   standardTypes: string[];
+  /** Hymn items per hymnal prefix before the hymnal filter, for the chips. */
+  hymnals?: Array<{ prefix: string; count: number }>;
+  /** The configured hymnals plus any other prefix in the library. */
+  hymnalList?: Hymnal[];
+}
+
+export interface Hymnal {
+  prefix: string;
+  name: string;
 }
 
 export type ActiveReason = "date" | "manual" | "both";
