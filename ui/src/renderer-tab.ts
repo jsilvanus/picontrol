@@ -2,15 +2,20 @@
 // Talks to pigateway /api/v1/pipgm/* (the gateway holds piprogram's key). Layout follows
 // docs/piprogram-control-plan.md: feed cards, feed focus view, playlist draft editor,
 // saved playlists, library, generate-for-date and monitor tiles.
-import { resolveApiUrl } from "./config";
+import { isOutsideLan, resolveApiUrl } from "./config";
 import { createPipgmClient, createPoller, PipgmError } from "./pipgm/api";
 import {
-  activeRowIndex, adviceFor, armSecondsLeft, comingUp, describeLoadReport, draftFromPipeline, filterLibrary,
+  activeRowIndex, adviceFor, armSecondsLeft, comingUp, describeLoadReport, draftFromPipeline,
   formatCountdown, groupSteps, moveEntry, parsePlaylistDocument, pollIntervalMs, removeAt, sameIds, addUnique, toDocument,
   type StepGroup
 } from "./pipgm/logic";
 import {
-  FEED_IDS, type FeedId, type LibraryItem, type Pipeline, type PlaylistSummary, type StepsResponse, type LoadReport
+  checkSoundFile, extensionForMime, formatDuration, localDay, normalizeType, pickRecorderMime, presetRange, reasonLabel,
+  canRemoveFromActive, recordingFilename, recordingSupport, titleFromFilename, toggleType, typeLabel, type DatePreset
+} from "./pipgm/library";
+import {
+  FEED_IDS, type ActiveFolder, type FeedId, type LibraryItem, type LibraryPage, type Pipeline, type PlaylistSummary,
+  type StepsResponse, type LoadReport
 } from "./pipgm/types";
 
 type View = { name: "operate" } | { name: "monitor" } | { name: "library" } | { name: "feed"; id: FeedId };
@@ -37,7 +42,22 @@ let dialog: "generate" | "save" | "permanent" | null = null;
 /** An add waiting for the "is this a permanent asset?" answer (no use date was given). */
 let pendingAdd: (() => void) | null = null;
 let generateState: { date: string; busy: boolean; draftName: string; items: string[]; missing: number } | null = null;
-let libFilter = { kind: "", day: "", text: "", target: "PiPGM1" as FeedId };
+const PAGE_SIZE = 100;
+let libFilter = {
+  types: [] as string[], from: "", to: "", unscheduled: false, sort: "newest" as "newest" | "oldest" | "title" | "used",
+  text: "", target: "PiPGM1" as FeedId
+};
+/** The filtered, paged answer of the service (the full list in `library` stays for lookups). */
+let libPage: LibraryPage | null = null;
+let libLimit = PAGE_SIZE;
+let activeFolder: ActiveFolder | null = null;
+let activeDate = "";
+let plpForm = { name: "", orientation: "", includeAudio: false };
+/** A sound waiting for its title, type and use date: a recording or a chosen file. */
+let soundSrc: { blob: Blob; filename: string; mime: string; recorded: boolean; url: string } | null = null;
+let soundForm = { title: "", type: "", useAt: "" };
+let rec: { recorder: MediaRecorder; stream: MediaStream; chunks: Blob[]; startedAt: number; mime: string; tick: number } | null = null;
+let textTimer: number | undefined;
 let panelOpen: { editor: boolean; saved: boolean } = { editor: true, saved: false };
 let dragIndex: number | null = null;
 let lastSignature = "";
@@ -122,7 +142,46 @@ async function ensureLibrary(force = false): Promise<void> {
   } catch (error) {
     showError(error);
   }
+  if (force) void loadLibraryPage();
   render();
+}
+
+async function loadLibraryPage(): Promise<void> {
+  try {
+    libPage = await client.getLibraryPage({
+      type: libFilter.types, q: libFilter.text, usedFrom: libFilter.from, usedTo: libFilter.to,
+      unscheduled: libFilter.unscheduled, sort: libFilter.sort, limit: libLimit
+    });
+  } catch (error) {
+    showError(error);
+  }
+  lastSignature = "";
+  const el = document.activeElement as HTMLInputElement | null;
+  const keep = !!el && el.dataset?.lib === "text";
+  const pos = el?.selectionStart ?? 0;
+  render(keep);
+  if (keep) {
+    const again = root?.querySelector<HTMLInputElement>("[data-lib=text]");
+    again?.focus();
+    again?.setSelectionRange(pos, pos);
+  }
+}
+
+async function loadActive(): Promise<void> {
+  try {
+    activeFolder = await client.getActive(activeDate || undefined);
+    if (!activeDate) activeDate = activeFolder.date;
+  } catch (error) {
+    showError(error);
+  }
+  lastSignature = "";
+  render();
+}
+
+function openLibrary(): void {
+  void ensureLibrary();
+  void loadLibraryPage();
+  void loadActive();
 }
 
 async function ensureSaved(force = false): Promise<void> {
@@ -164,7 +223,7 @@ function goto(next: View): void {
     void syncSteps().then(() => render());
     void ensureLibrary();
   }
-  if (next.name === "library") void ensureLibrary();
+  if (next.name === "library") openLibrary();
   render();
   refreshFrames();
 }
@@ -403,43 +462,152 @@ function renderFocus(id: FeedId): string {
   </div>`;
 }
 
-function renderLibrary(): string {
-  const items = library;
-  if (!items) return `<div class="text-on-surface-variant">Loading library…</div>`;
-  const filtered = filterLibrary(items, { kind: libFilter.kind, day: libFilter.day, text: libFilter.text });
-  const kinds = [...new Set(items.map((i) => i.kind))].sort();
-  return `<div class="flex flex-col gap-3">
+const INPUT = "h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm";
+const BTN = "h-10 px-3 rounded-lg bg-surface-container-highest font-label-md";
+const BTN_PRIMARY = "h-10 px-3 rounded-lg bg-primary text-on-primary font-label-md font-bold";
+
+function recordingSupportNow() {
+  if (typeof window === "undefined") return { ok: false, reason: "" };
+  return recordingSupport({
+    isSecureContext: window.isSecureContext,
+    hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
+    hasMediaRecorder: typeof MediaRecorder !== "undefined"
+  });
+}
+
+function renderTypeChips(): string {
+  const types = libPage?.types ?? [];
+  const total = types.reduce((n, t) => n + t.count, 0);
+  const chip = (on: boolean) => `h-9 px-3 rounded-full font-label-sm text-[12px] ${on ? "bg-primary text-on-primary" : "bg-surface-container-highest"}`;
+  return `<div class="flex gap-1.5 flex-wrap" role="group" aria-label="Filter by type">
+    <button type="button" data-action="lib-type-all" class="${chip(libFilter.types.length === 0)}">All (${total})</button>
+    ${types.map((t) => `<button type="button" data-action="lib-type" data-type="${esc(t.type)}" aria-pressed="${libFilter.types.includes(t.type)}" class="${chip(libFilter.types.includes(t.type))}">${esc(typeLabel(t.type))} (${t.count})</button>`).join("")}
+  </div>`;
+}
+
+function renderDateFilters(): string {
+  const preset = (p: DatePreset, label: string) => `<button type="button" data-action="lib-preset" data-preset="${p}" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]">${label}</button>`;
+  return `<div class="flex gap-2 flex-wrap items-center">
+    <span class="font-label-sm text-on-surface-variant">Used</span>
+    <input data-lib="from" type="date" value="${esc(libFilter.from)}" ${libFilter.unscheduled ? "disabled" : ""} class="${INPUT}" aria-label="Used from">
+    <span class="font-label-sm text-on-surface-variant">to</span>
+    <input data-lib="to" type="date" value="${esc(libFilter.to)}" ${libFilter.unscheduled ? "disabled" : ""} class="${INPUT}" aria-label="Used to">
+    ${preset("today", "Today")}${preset("week", "Next 7 days")}${preset("month", "Next 30 days")}
+    <label class="flex items-center gap-1 font-label-sm"><input type="checkbox" data-lib="unscheduled" ${libFilter.unscheduled ? "checked" : ""}> No date (permanent)</label>
+    ${libFilter.from || libFilter.to || libFilter.unscheduled ? `<button type="button" data-action="lib-clear-dates" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]">Clear dates</button>` : ""}
+  </div>`;
+}
+
+function renderActiveFolder(): string {
+  const a = activeFolder;
+  const lan = !isOutsideLan();
+  const rows = (a?.items ?? []).map(({ item, reason }) => `<li class="flex items-center gap-2 p-2 rounded-lg bg-surface-container">
+      <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[item.kind] ?? "article"}</span>
+      <div class="flex-1 min-w-0"><div class="font-body-md truncate">${esc(item.title)}</div>
+        <div class="font-label-sm text-[11px] text-on-surface-variant">${esc(typeLabel(item.type ?? item.kind))}${item.useAt?.length ? ` · ${esc(item.useAt.join(", "))}` : ""}</div></div>
+      <span class="px-2 py-0.5 rounded-full bg-secondary-container font-label-sm text-[11px]">${esc(reasonLabel(reason))}</span>
+      ${canRemoveFromActive(reason) ? `<button type="button" data-action="active-remove" data-id="${esc(item.id)}" aria-label="Remove ${esc(item.title)} from the active folder" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">close</span></button>` : ""}
+    </li>`).join("");
+  return `<section class="rounded-xl bg-surface-container-low border border-outline-variant/40 p-3 flex flex-col gap-2">
     <div class="flex gap-2 flex-wrap items-center">
-      <input data-lib="text" value="${esc(libFilter.text)}" placeholder="Search title" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm">
-      <select data-lib="kind" class="h-10 px-2 rounded-lg bg-surface-container-highest font-body-sm"><option value="">All kinds</option>${kinds.map((k) => `<option value="${esc(k)}" ${k === libFilter.kind ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
-      <input data-lib="day" type="date" value="${esc(libFilter.day)}" class="h-10 px-2 rounded-lg bg-surface-container-highest font-body-sm" aria-label="Used on day">
-      <select data-lib="target" class="h-10 px-2 rounded-lg bg-surface-container-highest font-body-sm" aria-label="Add to feed">${FEED_IDS.map((f) => `<option value="${f}" ${f === libFilter.target ? "selected" : ""}>Add to ${FEED_LABEL[f]}</option>`).join("")}</select>
-      <button type="button" data-action="reload-library" class="h-10 px-3 rounded-lg bg-surface-container-highest font-label-md">Reload</button>
+      <div class="font-label-md font-bold uppercase">Active folder</div>
+      <input data-active="date" type="date" value="${esc(activeDate)}" class="${INPUT}" aria-label="Active folder day">
+      <span class="font-label-sm text-on-surface-variant">${a ? `${a.dateCount} by date · ${a.manualCount} picked` : "Loading…"}</span>
+      ${lan && a?.manualCount ? `<button type="button" data-action="active-clear" class="${BTN} ml-auto">Clear picked</button>` : ""}
     </div>
-    <ul class="flex flex-col gap-1.5">${filtered.map((i) => {
+    <div class="font-label-sm text-[11px] text-on-surface-variant">Items whose use date covers the day are here by themselves. Add other items by hand with the star in the list below.</div>
+    <ul class="flex flex-col gap-1.5">${rows || `<li class="text-on-surface-variant font-body-sm">${a ? "Nothing is in the active folder for this day." : ""}</li>`}</ul>
+    ${a?.items.length ? `<div class="flex gap-2 flex-wrap items-center pt-1 border-t border-outline-variant/40">
+      <input data-plp="name" value="${esc(plpForm.name)}" placeholder="Playlist name" class="${INPUT} flex-1 min-w-[10rem]" aria-label="Playlist name">
+      <select data-plp="orientation" class="${INPUT}" aria-label="Orientation">${[["", "Default orientation"], ["landscape", "Landscape"], ["portrait", "Portrait"]].map(([v, l]) => `<option value="${v}" ${plpForm.orientation === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <label class="flex items-center gap-1 font-label-sm"><input type="checkbox" data-plp="includeAudio" ${plpForm.includeAudio ? "checked" : ""}> Include sounds</label>
+      <button type="button" data-action="active-playlist" class="${BTN_PRIMARY}">Create playlist from active folder</button>
+    </div>` : ""}
+  </section>`;
+}
+
+function renderSoundSection(): string {
+  const support = recordingSupportNow();
+  const types = [...new Set(["sound", "tts", "song", ...(libPage?.standardTypes ?? [])])];
+  let capture: string;
+  if (soundSrc) {
+    capture = `<div class="flex flex-col gap-2">
+      <div class="font-label-sm">${soundSrc.recorded ? "Recording ready" : "File chosen"}: ${esc(soundSrc.filename)}</div>
+      <audio controls src="${esc(soundSrc.url)}" class="w-full" aria-label="Preview on this device"></audio>
+      <div class="font-label-sm text-[11px] text-on-surface-variant">The preview plays on this device only, not on the church speakers.</div>
+      <div class="flex gap-2 flex-wrap">
+        <input data-snd="title" value="${esc(soundForm.title)}" placeholder="Title" class="${INPUT} flex-1 min-w-[10rem]">
+        <input data-snd="type" value="${esc(soundForm.type)}" list="lib-types" placeholder="Type (default sound)" class="${INPUT} w-44">
+        <datalist id="lib-types">${types.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
+        <input data-snd="useAt" value="${esc(soundForm.useAt)}" placeholder="Use date (optional), e.g. 2026-11-29" class="${INPUT} w-full">
+      </div>
+      <div class="flex gap-2"><button type="button" data-action="sound-save" class="${BTN_PRIMARY}">Save to library</button><button type="button" data-action="sound-discard" class="${BTN}">Discard</button></div>
+    </div>`;
+  } else if (rec) {
+    capture = `<div class="flex items-center gap-3"><span class="inline-block w-3 h-3 rounded-full bg-error animate-pulse" aria-hidden="true"></span>
+      <span class="font-body-md">Recording <span data-rec-elapsed>0:00</span></span>
+      <button type="button" data-action="rec-stop" class="${BTN_PRIMARY}">Stop</button></div>`;
+  } else {
+    capture = `<div class="flex gap-2 flex-wrap items-center">
+      <button type="button" data-action="rec-start" ${support.ok ? "" : "disabled"} class="${BTN} ${support.ok ? "" : "opacity-50"}"><span class="material-symbols-outlined align-middle">mic</span> Record sound</button>
+      <label class="${BTN} inline-flex items-center cursor-pointer"><span class="material-symbols-outlined align-middle mr-1">upload_file</span> Upload sound<input type="file" data-snd-file accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.flac,.webm" class="sr-only"></label>
+      ${support.ok ? "" : `<div class="font-label-sm text-[11px] text-on-surface-variant w-full">${esc(support.reason)}</div>`}
+    </div>`;
+  }
+  return `<section class="rounded-xl bg-surface-container-low border border-outline-variant/40 p-3 flex flex-col gap-2">
+    <div class="font-label-md font-bold uppercase">Add sound</div>
+    <div class="font-label-sm text-[11px] text-on-surface-variant">Any format (wav, mp3, m4a, ogg, flac…); piprogram converts it. Adding a sound plays nothing.</div>
+    ${capture}</section>`;
+}
+
+function renderLibrary(): string {
+  const page = libPage;
+  if (!page) return `<div class="text-on-surface-variant">Loading library…</div>`;
+  const lan = !isOutsideLan();
+  const pickedIds = new Set((activeFolder?.items ?? []).filter((a) => a.reason !== "date").map((a) => a.item.id));
+  const inFolder = new Set((activeFolder?.items ?? []).map((a) => a.item.id));
+  return `<div class="flex flex-col gap-3">
+    ${renderActiveFolder()}
+    ${renderSoundSection()}
+    ${renderTypeChips()}
+    <div class="flex gap-2 flex-wrap items-center">
+      <input data-lib="text" value="${esc(libFilter.text)}" placeholder="Search title" class="${INPUT}">
+      <select data-lib="sort" class="${INPUT}" aria-label="Sort">${[["newest", "Newest"], ["oldest", "Oldest"], ["title", "Title"], ["used", "Use date"]].map(([v, l]) => `<option value="${v}" ${libFilter.sort === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <select data-lib="target" class="${INPUT}" aria-label="Add to feed">${FEED_IDS.map((f) => `<option value="${f}" ${f === libFilter.target ? "selected" : ""}>Add to ${FEED_LABEL[f]}</option>`).join("")}</select>
+      <button type="button" data-action="reload-library" class="${BTN}">Reload</button>
+    </div>
+    ${renderDateFilters()}
+    <div class="font-label-sm text-on-surface-variant">${page.total} item${page.total === 1 ? "" : "s"}</div>
+    <ul class="flex flex-col gap-1.5">${page.items.map((i) => {
       const canva = i.canva?.exportJob;
       const canvaBad = canva?.status === "failed";
       const canvaBusy = canva && canva.status && !["ready", "completed", "success", "failed", "idle"].includes(canva.status);
+      const picked = pickedIds.has(i.id);
+      const star = inFolder.has(i.id) && !picked ? `<span class="material-symbols-outlined text-primary" title="In the active folder by date" aria-label="In the active folder by date">event_available</span>`
+        : `<button type="button" data-action="${picked ? "active-remove" : "active-add"}" data-id="${esc(i.id)}" aria-pressed="${picked}" aria-label="${picked ? "Remove from" : "Add to"} the active folder" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined ${picked ? "text-primary" : ""}">${picked ? "star" : "star_border"}</span></button>`;
       return `<li class="flex items-center gap-2 p-2 rounded-lg bg-surface-container">
         <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[i.kind] ?? "article"}</span>
         <div class="flex-1 min-w-0"><div class="font-body-md truncate">${esc(i.title)}</div>
-          <div class="font-label-sm text-[11px] text-on-surface-variant">${esc(i.kind)}${i.useAt?.length ? ` · ${esc(i.useAt.join(", "))}` : ""}${canvaBusy ? ` · <span class="text-amber-600">Canva ${esc(canva?.status)}…</span>` : ""}${canvaBad ? ` · <span class="text-error">Canva failed${canva?.error ? `: ${esc(canva.error)}` : ""}</span>` : ""}</div></div>
+          <div class="font-label-sm text-[11px] text-on-surface-variant"><span class="px-1.5 py-0.5 rounded-full bg-secondary-container">${esc(typeLabel(i.type ?? i.kind))}</span>${i.audio?.durationMs ? ` · ${esc(formatDuration(i.audio.durationMs))}` : ""}${i.audio?.origin === "recording" ? " · recorded" : ""}${i.useAt?.length ? ` · ${esc(i.useAt.join(", "))}` : ""}${canvaBusy ? ` · <span class="text-amber-600">Canva ${esc(canva?.status)}…</span>` : ""}${canvaBad ? ` · <span class="text-error">Canva failed${canva?.error ? `: ${esc(canva.error)}` : ""}</span>` : ""}</div></div>
+        ${star}
         ${i.kind === "audio" ? "" : `<button type="button" data-action="lib-add" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Add</button>`}
+        ${lan ? `<button type="button" data-action="lib-delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.title)}" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">delete</span></button>` : ""}
       </li>`;
     }).join("") || `<li class="text-on-surface-variant font-body-sm">Nothing matches.</li>`}</ul>
+    ${page.items.length < page.total ? `<button type="button" data-action="lib-more" class="${BTN} self-center">Show more (${page.total - page.items.length} left)</button>` : ""}
     <section class="rounded-xl bg-surface-container-low border border-outline-variant/40 p-3 flex flex-col gap-2">
-      <div class="font-label-md font-bold uppercase">Add content <span class="font-normal normal-case text-on-surface-variant">(church network only)</span></div>
+      <div class="font-label-md font-bold uppercase">Add content</div>
       <div class="flex gap-2 flex-wrap items-center">
         <input data-new="use-at" placeholder="Use date (optional), e.g. 2026-11-22" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm w-full">
         <div class="font-label-sm text-[11px] text-on-surface-variant w-full">Without a date the item is kept as a permanent asset.</div>
         <input data-new="youtube" placeholder="YouTube link" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm flex-1 min-w-[12rem]">
-        <button type="button" data-action="add-youtube" class="h-10 px-3 rounded-lg bg-surface-container-highest font-label-md">Add video</button>
+        <button type="button" data-action="add-youtube" class="${BTN}">Add video</button>
       </div>
       <div class="flex gap-2 flex-wrap items-start">
         <input data-new="hymn-number" placeholder="Number" class="h-10 w-24 px-3 rounded-lg bg-surface-container-highest font-body-sm">
         <input data-new="hymn-title" placeholder="Hymn title" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm flex-1 min-w-[10rem]">
         <textarea data-new="hymn-text" rows="3" placeholder="Stanzas (blank line between stanzas)" class="px-3 py-2 rounded-lg bg-surface-container-highest font-body-sm w-full"></textarea>
-        <button type="button" data-action="add-hymn" class="h-10 px-3 rounded-lg bg-surface-container-highest font-label-md">Add hymn</button>
+        <button type="button" data-action="add-hymn" class="${BTN}">Add hymn</button>
       </div>
     </section>
   </div>`;
@@ -487,6 +655,8 @@ function signature(): string {
   return JSON.stringify([
     view, pipelines.map((p) => [p.id, p.state, p.playbackState, p.fadeToBlack, p.activeItemId, p.currentStep, p.totalSteps, p.audioEnabled, p.audioArmedUntil, !!p.audioTrack, p.playlist.map((i) => i.id), p.orientation]),
     [...stepsByFeed.entries()].map(([k, v]) => [k, v.steps.length, v.currentStep]), stepsKey.size,
+    libPage?.items.map((i) => [i.id, i.title, i.type, i.useAt]), libPage?.total, libPage?.types, activeFolder?.items.map((a) => [a.item.id, a.reason]),
+    activeDate, plpForm, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
     [...drafts.entries()], library?.length, saved?.map((s) => s.id), banner, notice, loadReport?.report.mode, dialog, generateState,
     libFilter, panelOpen, offline, pipelines.some((p) => armSecondsLeft(p) > 0) ? mins : 0
   ]);
@@ -658,7 +828,41 @@ function onClick(event: Event): void {
       if (id && generateState) { setDraft(id, generateState.items); dialog = null; generateState = null; panelOpen = { ...panelOpen, editor: true }; render(); }
       break;
     // library
-    case "reload-library": library = null; void ensureLibrary(true); break;
+    case "reload-library": library = null; void ensureLibrary(true); void loadActive(); break;
+    case "lib-type": libFilter.types = toggleType(libFilter.types, target.dataset.type ?? ""); libLimit = PAGE_SIZE; void loadLibraryPage(); break;
+    case "lib-type-all": libFilter.types = []; libLimit = PAGE_SIZE; void loadLibraryPage(); break;
+    case "lib-preset": { const r = presetRange((target.dataset.preset ?? "today") as DatePreset); libFilter.from = r.from; libFilter.to = r.to; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break; }
+    case "lib-clear-dates": libFilter.from = ""; libFilter.to = ""; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break;
+    case "lib-more": libLimit += PAGE_SIZE; void loadLibraryPage(); break;
+    case "lib-delete": {
+      const itemId = target.dataset.id ?? "";
+      const it = itemById(itemId);
+      if (itemId && window.confirm(`Delete “${it?.title ?? itemId}” from the library? It also leaves every playlist.`)) {
+        void act(() => client.deleteItem(itemId), () => { library = null; void ensureLibrary(true); void loadActive(); });
+      }
+      break;
+    }
+    case "active-add": if (target.dataset.id) void act(() => client.addActive(target.dataset.id as string), (f) => { activeFolder = f; }); break;
+    case "active-remove": if (target.dataset.id) void act(() => client.removeActive(target.dataset.id as string), (f) => { activeFolder = f; }); break;
+    case "active-clear": void act(() => client.clearActive(), () => { void loadActive(); }); break;
+    case "active-playlist": {
+      const name = plpForm.name.trim();
+      if (!name) { banner = { title: "The playlist needs a name", next: "Type a name, then create it." }; render(); break; }
+      void act(
+        () => client.playlistFromActive({ name, date: activeDate || undefined, includeAudio: plpForm.includeAudio, ...(plpForm.orientation ? { orientation: plpForm.orientation } : {}) }),
+        (r) => {
+          plpForm = { ...plpForm, name: "" };
+          notice = `Saved playlist “${r.name}” (${r.items.length} items${r.skippedAudio ? `, ${r.skippedAudio} sound(s) left out` : ""}). Load it from a feed.`;
+          setTimeout(() => { notice = ""; render(); }, 6000);
+          void ensureSaved(true);
+        }
+      );
+      break;
+    }
+    case "rec-start": void startRecording(); break;
+    case "rec-stop": stopRecording(); break;
+    case "sound-discard": clearSound(); render(); break;
+    case "sound-save": saveSound(); break;
     case "lib-add": {
       const itemId = target.dataset.id ?? "";
       const t = libFilter.target;
@@ -695,6 +899,117 @@ function withUseDate(run: (useAt: string) => void): void {
   render();
 }
 
+/** Keeps what is typed in the sound and playlist forms, without rebuilding the page. */
+function storeForm(t: HTMLElement): void {
+  const el = t as HTMLInputElement;
+  const snd = t.dataset.snd as "title" | "type" | "useAt" | undefined;
+  if (snd) soundForm[snd] = el.value;
+  const plp = t.dataset.plp;
+  if (plp === "name") plpForm.name = el.value;
+  else if (plp === "orientation") plpForm.orientation = el.value;
+  else if (plp === "includeAudio") plpForm.includeAudio = el.checked;
+}
+
+function clearSound(): void {
+  if (soundSrc) URL.revokeObjectURL(soundSrc.url);
+  soundSrc = null;
+  soundForm = { title: "", type: "", useAt: "" };
+}
+
+function setSound(blob: Blob, filename: string, mime: string, recorded: boolean): void {
+  clearSound();
+  soundSrc = { blob, filename, mime, recorded, url: URL.createObjectURL(blob) };
+  soundForm.title = recorded ? "" : titleFromFilename(filename);
+  lastSignature = "";
+  render(true);
+}
+
+async function startRecording(): Promise<void> {
+  const support = recordingSupportNow();
+  if (!support.ok) { banner = { title: "Cannot record here", next: support.reason ?? "" }; render(); return; }
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    banner = { title: "The microphone is not available", next: "Allow microphone access for this page in the browser, or upload a file instead." };
+    render();
+    return;
+  }
+  const mime = pickRecorderMime((m) => MediaRecorder.isTypeSupported(m)) ?? "";
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  } catch {
+    stream.getTracks().forEach((tr) => tr.stop());
+    banner = { title: "Recording is not supported", next: "This browser cannot record in a usable format. Upload a file instead." };
+    render();
+    return;
+  }
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    stream.getTracks().forEach((tr) => tr.stop());
+    if (rec) window.clearInterval(rec.tick);
+    rec = null;
+    const type = recorder.mimeType || mime || "audio/webm";
+    const blob = new Blob(chunks, { type });
+    if (!blob.size) { banner = { title: "Nothing was recorded", next: "Check the microphone and try again." }; render(); return; }
+    setSound(blob, recordingFilename(new Date(), type), type, true);
+  };
+  const startedAt = Date.now();
+  const tick = window.setInterval(() => {
+    const secs = Math.floor((Date.now() - startedAt) / 1000);
+    const el = root?.querySelector("[data-rec-elapsed]");
+    if (el) el.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+    if (secs >= 15 * 60) stopRecording();
+  }, 500);
+  rec = { recorder, stream, chunks, startedAt, mime, tick };
+  recorder.start(1000);
+  lastSignature = "";
+  render(true);
+}
+
+function stopRecording(): void {
+  if (rec && rec.recorder.state !== "inactive") rec.recorder.stop();
+}
+
+function readBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read the file"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function saveSound(): void {
+  const src = soundSrc;
+  if (!src) return;
+  const go = (): void => {
+    void act(async () => {
+      const dataBase64 = await readBase64(src.blob);
+      const filename = /\.[a-z0-9]+$/i.test(src.filename) ? src.filename : `${src.filename}.${extensionForMime(src.mime)}`;
+      const type = normalizeType(soundForm.type);
+      return client.uploadSound({
+        filename, mimeType: src.mime, dataBase64, recorded: src.recorded,
+        ...(soundForm.title.trim() ? { title: soundForm.title.trim() } : {}),
+        ...(type ? { type } : {}), ...(soundForm.useAt.trim() ? { useAt: soundForm.useAt.trim() } : {})
+      });
+    }, (item) => {
+      clearSound();
+      notice = `Saved “${item.title}” to the library.`;
+      setTimeout(() => { notice = ""; render(); }, 4000);
+      library = null;
+      void ensureLibrary(true);
+      void loadActive();
+    });
+  };
+  if (soundForm.useAt.trim()) { go(); return; }
+  pendingAdd = go;
+  dialog = "permanent";
+  render();
+}
+
 function onChange(event: Event): void {
   const t = event.target as HTMLElement;
   if (t instanceof HTMLInputElement && t.dataset.import !== undefined) {
@@ -709,25 +1024,38 @@ function onChange(event: Event): void {
     t.value = "";
     return;
   }
-  const lib = (t as HTMLElement).dataset.lib;
+  if (t instanceof HTMLInputElement && t.dataset.sndFile !== undefined) {
+    const file = t.files?.[0];
+    t.value = "";
+    if (!file) return;
+    const problem = checkSoundFile(file);
+    if (problem) { banner = { title: "Cannot use this file", next: problem }; render(); return; }
+    setSound(file, file.name, file.type || "audio/mpeg", false);
+    return;
+  }
+  const d = t.dataset;
+  if (d.snd || d.plp) { storeForm(t); return; }
+  if (d.active === "date" && t instanceof HTMLInputElement) { activeDate = t.value; void loadActive(); return; }
+  const lib = d.lib;
   if (lib && (t instanceof HTMLInputElement || t instanceof HTMLSelectElement)) {
-    (libFilter as Record<string, string>)[lib] = t.value;
+    if (lib === "unscheduled") libFilter.unscheduled = (t as HTMLInputElement).checked;
+    else (libFilter as unknown as Record<string, string>)[lib] = t.value;
     lastSignature = "";
+    if (lib !== "target") { libLimit = PAGE_SIZE; void loadLibraryPage(); }
     render(true);
   }
 }
 
 function onInput(event: Event): void {
   const t = event.target;
+  if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) {
+    if (t.dataset.snd || t.dataset.plp) { storeForm(t); return; }
+  }
   if (t instanceof HTMLInputElement && t.dataset.lib === "text") {
     libFilter.text = t.value;
-    // Re-render the list only; keep focus in the box by restoring it after the rebuild.
-    const pos = t.selectionStart ?? t.value.length;
-    lastSignature = "";
-    render(true);
-    const again = root?.querySelector<HTMLInputElement>("[data-lib=text]");
-    again?.focus();
-    again?.setSelectionRange(pos, pos);
+    // Ask the service after a short pause; the box keeps focus (render() skips while typing).
+    if (textTimer !== undefined) window.clearTimeout(textTimer);
+    textTimer = window.setTimeout(() => { libLimit = PAGE_SIZE; void loadLibraryPage(); }, 300);
   }
 }
 

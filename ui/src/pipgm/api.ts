@@ -1,9 +1,10 @@
 // Client for piprogram through the gateway (/api/v1/pipgm/*) and a small poller.
 // Writes need the gateway's own key; the browser only carries its session cookie.
 import type {
-  ControlRequest, FeedId, LibraryItem, LibraryStorage, LoadReport, Pipeline, PlaylistDocument,
-  PlaylistSummary, SavedPlaylist, StepsResponse
+  ActiveFolder, ControlRequest, FeedId, LibraryItem, LibraryPage, LibraryQuery, LibraryStorage, LoadReport, Pipeline,
+  PlaylistDocument, PlaylistSummary, SavedPlaylist, SoundUpload, StepsResponse
 } from "./types.ts";
+import { itemsQueryString } from "./library.ts";
 
 export class PipgmError extends Error {
   status: number;
@@ -71,6 +72,24 @@ export function createPipgmClient(options: ClientOptions) {
     async getItems(): Promise<LibraryItem[]> {
       return (await call<{ items: LibraryItem[] }>("GET", "/items")).items;
     },
+    getLibraryPage: (query: LibraryQuery) => call<LibraryPage>("GET", `/items${itemsQueryString(query)}`),
+    getActive: (date?: string) => call<ActiveFolder>("GET", `/library/active${date ? `?date=${enc(date)}` : ""}`),
+    addActive: (itemId: string) => call<ActiveFolder>("PUT", `/library/active/${enc(itemId)}`),
+    removeActive: (itemId: string) => call<ActiveFolder>("DELETE", `/library/active/${enc(itemId)}`),
+    /** LAN only on the gateway. */
+    clearActive: () => call<unknown>("DELETE", "/library/active"),
+    playlistFromActive: (body: { name: string; date?: string; orientation?: string; itemIds?: string[]; includeAudio?: boolean }) =>
+      call<SavedPlaylist & { skippedAudio?: number }>("POST", "/library/active/playlist", body),
+    /** Any audio format; piprogram converts it. Nothing plays. */
+    uploadSound: (u: SoundUpload) =>
+      call<LibraryItem>("POST", "/items/media", {
+        kind: "audio", filename: u.filename, mimeType: u.mimeType, dataBase64: u.dataBase64,
+        ...(u.title ? { title: u.title } : {}), ...(u.type ? { type: u.type } : {}),
+        ...(u.useAt ? { useAt: u.useAt } : {}), ...(u.recorded ? { recorded: true } : {})
+      }),
+    setItemType: (itemId: string, type: string | null) => call<LibraryItem>("PATCH", `/items/${enc(itemId)}`, { type }),
+    /** LAN only on the gateway. */
+    deleteItem: (itemId: string) => call<void>("DELETE", `/items/${enc(itemId)}`),
     getStorage: () => call<LibraryStorage>("GET", "/library/storage"),
     async listPlaylists(): Promise<PlaylistSummary[]> {
       return (await call<{ items: PlaylistSummary[] }>("GET", "/playlists")).items;
