@@ -169,3 +169,83 @@ test("run page: id from the path, auto-run only on the LAN for a fresh single-us
   assert.equal(describeStep({ action: "matrix:route", params: { input: 3, output: 2 } }), "Send Pi input 3 to the right projector");
   assert.equal(describeStep({ action: "pipgm:ftb", params: { feed: "PiPGM1", on: false } }), "Show the picture of PiPGM1");
 });
+
+// ---- typed library, sound upload, active folder ----------------------------
+import {
+  itemsQueryString, toggleType, presetRange, recordingSupport, pickRecorderMime, extensionForMime, titleFromFilename,
+  checkSoundFile, normalizeType, canRemoveFromActive, reasonLabel, typeLabel, MAX_SOUND_BYTES
+} from "../ui/src/pipgm/library.ts";
+
+test("items query string carries types, dates, sort and paging", () => {
+  assert.equal(itemsQueryString({}), "");
+  const qs = itemsQueryString({ type: ["hymn", "tts"], q: " virsi ", usedFrom: "2026-11-23", usedTo: "2026-11-30", sort: "used", limit: 100 });
+  const p = new URLSearchParams(qs.slice(1));
+  assert.equal(p.get("type"), "hymn,tts");
+  assert.equal(p.get("q"), "virsi");
+  assert.equal(p.get("usedFrom"), "2026-11-23");
+  assert.equal(p.get("limit"), "100");
+  // unscheduled replaces the dates
+  const u = new URLSearchParams(itemsQueryString({ unscheduled: true, usedFrom: "2026-11-23" }).slice(1));
+  assert.equal(u.get("unscheduled"), "true");
+  assert.equal(u.has("usedFrom"), false);
+});
+
+test("type chips toggle and date presets", () => {
+  assert.deepEqual(toggleType(["a"], "b"), ["a", "b"]);
+  assert.deepEqual(toggleType(["a", "b"], "a"), ["b"]);
+  assert.deepEqual(presetRange("week", new Date(2026, 10, 23)), { from: "2026-11-23", to: "2026-11-30" });
+  assert.deepEqual(presetRange("today", new Date(2026, 10, 23)), { from: "2026-11-23", to: "2026-11-23" });
+});
+
+test("recording needs a secure page and MediaRecorder", () => {
+  assert.equal(recordingSupport({ isSecureContext: false, hasGetUserMedia: true, hasMediaRecorder: true }).ok, false);
+  assert.match(recordingSupport({ isSecureContext: false, hasGetUserMedia: true, hasMediaRecorder: true }).reason, /https/);
+  assert.equal(recordingSupport({ isSecureContext: true, hasGetUserMedia: false, hasMediaRecorder: true }).ok, false);
+  assert.equal(recordingSupport({ isSecureContext: true, hasGetUserMedia: true, hasMediaRecorder: true }).ok, true);
+});
+
+test("recorder mime preference and file naming", () => {
+  assert.equal(pickRecorderMime((m) => m === "audio/mp4"), "audio/mp4");
+  assert.equal(pickRecorderMime(() => false), undefined);
+  assert.equal(extensionForMime("audio/webm;codecs=opus"), "webm");
+  assert.equal(titleFromFilename("Aamen_jingle.final.mp3"), "Aamen jingle.final");
+});
+
+test("sound file check and type normalisation", () => {
+  assert.equal(checkSoundFile({ name: "a.mp3", type: "audio/mpeg", size: 10 }), null);
+  assert.equal(checkSoundFile({ name: "a.flac", type: "", size: 10 }), null);
+  assert.ok(checkSoundFile({ name: "a.pdf", type: "application/pdf", size: 10 }));
+  assert.ok(checkSoundFile({ name: "a.mp3", type: "audio/mpeg", size: MAX_SOUND_BYTES + 1 }));
+  assert.ok(checkSoundFile({ name: "a.mp3", type: "audio/mpeg", size: 0 }));
+  assert.equal(normalizeType(" Jingle Pack! "), "jingle-pack");
+  assert.equal(normalizeType("  "), undefined);
+});
+
+test("active folder reasons", () => {
+  assert.equal(canRemoveFromActive("date"), false);
+  assert.equal(canRemoveFromActive("manual"), true);
+  assert.equal(canRemoveFromActive("both"), true);
+  assert.equal(reasonLabel("both"), "by date + picked");
+  assert.equal(typeLabel("tts"), "TTS");
+  assert.equal(typeLabel("jingle"), "Jingle");
+});
+
+test("client talks to the library, active folder and sound upload routes", async () => {
+  const { f, calls } = fakeFetch(() => ({ body: { items: [], total: 0, types: [], standardTypes: [] } }));
+  const client = createPipgmClient({ resolve: (p) => p, fetch: f });
+  await client.getLibraryPage({ type: ["sound"], limit: 100 });
+  assert.equal(calls[0].url, "/api/v1/pipgm/items?type=sound&limit=100");
+  await client.getActive("2026-11-23");
+  assert.equal(calls[1].url, "/api/v1/pipgm/library/active?date=2026-11-23");
+  await client.addActive("a b");
+  assert.equal(calls[2].url, "/api/v1/pipgm/library/active/a%20b");
+  assert.equal(calls[2].init.method, "PUT");
+  await client.removeActive("x");
+  assert.equal(calls[3].init.method, "DELETE");
+  await client.playlistFromActive({ name: "Sunday", includeAudio: false });
+  assert.equal(calls[4].url, "/api/v1/pipgm/library/active/playlist");
+  assert.deepEqual(JSON.parse(calls[4].init.body), { name: "Sunday", includeAudio: false });
+  await client.uploadSound({ filename: "r.webm", mimeType: "audio/webm", dataBase64: "AAA", recorded: true, type: "sound" });
+  assert.equal(calls[5].url, "/api/v1/pipgm/items/media");
+  assert.deepEqual(JSON.parse(calls[5].init.body), { kind: "audio", filename: "r.webm", mimeType: "audio/webm", dataBase64: "AAA", type: "sound", recorded: true });
+});

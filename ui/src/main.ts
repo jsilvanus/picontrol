@@ -9,7 +9,7 @@ import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopB
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
-import { resolveApiUrl, resolveGatewayBaseUrl, setRuntimeGatewayBase } from "./config";
+import { resolveApiUrl, resolveGatewayBaseUrl, setOutsideLan, setRuntimeGatewayBase } from "./config";
 import { currentRunId, openRunPage } from "./run-page";
 import { renderStatusTab, setStatusTabActive, refreshStatusTelemetry } from "./status-tab";
 import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler } from "./ui-access";
@@ -2956,6 +2956,7 @@ async function bootstrap(): Promise<void> {
   const session = await ensureUiSession(uiBase);
   uiPinSession = Boolean(uiBase && session);
   const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
+  setOutsideLan(isOutsideLan);
   serverModules = await fetchServerModules(uiBase);
   applyModuleVisibility(serverModules, isOutsideLan);
 

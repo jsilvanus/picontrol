@@ -22,7 +22,10 @@ export interface LibraryItem {
   entryId?: string;
   title: string;
   kind: ItemKind;
+  /** Library type (sound, tts, hymn, song, image, video, slides, canva or a custom name). */
+  type?: string;
   createdAt?: string;
+  audio?: { origin?: string; durationMs?: number };
   useAt?: string[];
   steps?: StepDescriptor[];
   hymn?: { hymnNumber: string; title: string };
@@ -127,4 +130,42 @@ export interface LibraryStorage {
   ok?: boolean;
   loaded?: boolean;
   [key: string]: unknown;
+}
+
+export interface LibraryQuery {
+  type?: string[];
+  q?: string;
+  usedFrom?: string;
+  usedTo?: string;
+  unscheduled?: boolean;
+  sort?: "newest" | "oldest" | "title" | "used";
+  limit?: number;
+  offset?: number;
+}
+
+export interface LibraryPage {
+  items: LibraryItem[];
+  total: number;
+  /** Matches per type before the type filter, for the filter chips. */
+  types: Array<{ type: string; count: number }>;
+  standardTypes: string[];
+}
+
+export type ActiveReason = "date" | "manual" | "both";
+
+export interface ActiveFolder {
+  date: string;
+  items: Array<{ item: LibraryItem; reason: ActiveReason }>;
+  dateCount: number;
+  manualCount: number;
+}
+
+export interface SoundUpload {
+  filename: string;
+  mimeType: string;
+  dataBase64: string;
+  title?: string;
+  type?: string;
+  useAt?: string;
+  recorded?: boolean;
 }

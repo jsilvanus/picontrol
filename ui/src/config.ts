@@ -14,6 +14,17 @@ export function normalizeBaseUrl(value: string | null | undefined): string {
 }
 
 let runtimeGatewayBase = "";
+let outsideLan = false;
+
+/** Set by the UI start-up: true when the page reaches the gateway through the relay (outside the church network). */
+export function setOutsideLan(value: boolean): void {
+  outsideLan = value;
+}
+
+/** True outside the LAN. LAN-only actions (delete, clear) are hidden there. */
+export function isOutsideLan(): boolean {
+  return outsideLan;
+}
 
 /** Set by the UI start-up when it picked the relay (outside the LAN): every /api request then goes there. */
 export function setRuntimeGatewayBase(base: string): void {
