@@ -249,3 +249,14 @@ test("client talks to the library, active folder and sound upload routes", async
   assert.equal(calls[5].url, "/api/v1/pipgm/items/media");
   assert.deepEqual(JSON.parse(calls[5].init.body), { kind: "audio", filename: "r.webm", mimeType: "audio/webm", dataBase64: "AAA", type: "sound", recorded: true });
 });
+
+test("client changes the library type with PATCH, null restores the default", async () => {
+  const { f, calls } = fakeFetch(() => ({ body: { id: "a" } }));
+  const client = createPipgmClient({ resolve: (p) => p, fetch: f });
+  await client.setItemType("a", "jingle");
+  await client.setItemType("a", null);
+  assert.equal(calls[0].init.method, "PATCH");
+  assert.equal(calls[0].url, "/api/v1/pipgm/items/a");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { type: "jingle" });
+  assert.deepEqual(JSON.parse(calls[1].init.body), { type: null });
+});

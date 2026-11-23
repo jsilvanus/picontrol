@@ -58,6 +58,8 @@ let soundSrc: { blob: Blob; filename: string; mime: string; recorded: boolean; u
 let soundForm = { title: "", type: "", useAt: "" };
 let rec: { recorder: MediaRecorder; stream: MediaStream; chunks: Blob[]; startedAt: number; mime: string; tick: number } | null = null;
 let textTimer: number | undefined;
+/** The row whose library type is being changed. */
+let typeEdit: { id: string; value: string } | null = null;
 let panelOpen: { editor: boolean; saved: boolean } = { editor: true, saved: false };
 let dragIndex: number | null = null;
 let lastSignature = "";
@@ -589,6 +591,13 @@ function renderLibrary(): string {
         <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[i.kind] ?? "article"}</span>
         <div class="flex-1 min-w-0"><div class="font-body-md truncate">${esc(i.title)}</div>
           <div class="font-label-sm text-[11px] text-on-surface-variant"><span class="px-1.5 py-0.5 rounded-full bg-secondary-container">${esc(typeLabel(i.type ?? i.kind))}</span>${i.audio?.durationMs ? ` · ${esc(formatDuration(i.audio.durationMs))}` : ""}${i.audio?.origin === "recording" ? " · recorded" : ""}${i.useAt?.length ? ` · ${esc(i.useAt.join(", "))}` : ""}${canvaBusy ? ` · <span class="text-amber-600">Canva ${esc(canva?.status)}…</span>` : ""}${canvaBad ? ` · <span class="text-error">Canva failed${canva?.error ? `: ${esc(canva.error)}` : ""}</span>` : ""}</div></div>
+        ${typeEdit?.id === i.id ? `<div class="flex gap-1 items-center flex-wrap">
+          <input data-typeedit value="${esc(typeEdit.value)}" list="lib-types-edit" placeholder="Type" aria-label="Library type of ${esc(i.title)}" class="h-9 w-32 px-2 rounded-md bg-surface-container-highest font-body-sm">
+          <datalist id="lib-types-edit">${[...new Set([...(page.standardTypes ?? []), ...page.types.map((t) => t.type)])].map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
+          <button type="button" data-action="type-save" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Save</button>
+          <button type="button" data-action="type-default" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]" title="Use the default type of this kind of item">Default</button>
+          <button type="button" data-action="type-cancel" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]">Cancel</button>
+        </div>` : `<button type="button" data-action="type-edit" data-id="${esc(i.id)}" aria-label="Change type of ${esc(i.title)}" title="Change type" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">label</span></button>`}
         ${star}
         ${i.kind === "audio" ? "" : `<button type="button" data-action="lib-add" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Add</button>`}
         ${lan ? `<button type="button" data-action="lib-delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.title)}" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">delete</span></button>` : ""}
@@ -656,7 +665,7 @@ function signature(): string {
     view, pipelines.map((p) => [p.id, p.state, p.playbackState, p.fadeToBlack, p.activeItemId, p.currentStep, p.totalSteps, p.audioEnabled, p.audioArmedUntil, !!p.audioTrack, p.playlist.map((i) => i.id), p.orientation]),
     [...stepsByFeed.entries()].map(([k, v]) => [k, v.steps.length, v.currentStep]), stepsKey.size,
     libPage?.items.map((i) => [i.id, i.title, i.type, i.useAt]), libPage?.total, libPage?.types, activeFolder?.items.map((a) => [a.item.id, a.reason]),
-    activeDate, plpForm, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
+    activeDate, plpForm, typeEdit?.id, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
     [...drafts.entries()], library?.length, saved?.map((s) => s.id), banner, notice, loadReport?.report.mode, dialog, generateState,
     libFilter, panelOpen, offline, pipelines.some((p) => armSecondsLeft(p) > 0) ? mins : 0
   ]);
@@ -834,6 +843,16 @@ function onClick(event: Event): void {
     case "lib-preset": { const r = presetRange((target.dataset.preset ?? "today") as DatePreset); libFilter.from = r.from; libFilter.to = r.to; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break; }
     case "lib-clear-dates": libFilter.from = ""; libFilter.to = ""; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break;
     case "lib-more": libLimit += PAGE_SIZE; void loadLibraryPage(); break;
+    case "type-edit": { const it = page_item(target.dataset.id ?? ""); typeEdit = { id: target.dataset.id ?? "", value: it?.type ?? "" }; lastSignature = ""; render(true); break; }
+    case "type-cancel": typeEdit = null; lastSignature = ""; render(true); break;
+    case "type-save": case "type-default": {
+      const itemId = target.dataset.id ?? "";
+      const type = action === "type-default" ? null : (normalizeType(typeEdit?.value ?? "") ?? null);
+      if (!itemId) break;
+      if (action === "type-save" && !type) { banner = { title: "Type is empty", next: "Type a name, or press Default to use the default type of this item." }; render(); break; }
+      void act(() => client.setItemType(itemId, type), () => { typeEdit = null; library = null; void ensureLibrary(true); void loadActive(); });
+      break;
+    }
     case "lib-delete": {
       const itemId = target.dataset.id ?? "";
       const it = itemById(itemId);
@@ -900,8 +919,13 @@ function withUseDate(run: (useAt: string) => void): void {
 }
 
 /** Keeps what is typed in the sound and playlist forms, without rebuilding the page. */
+function page_item(id: string): LibraryItem | undefined {
+  return libPage?.items.find((i) => i.id === id);
+}
+
 function storeForm(t: HTMLElement): void {
   const el = t as HTMLInputElement;
+  if (t.dataset.typeedit !== undefined) { if (typeEdit) typeEdit.value = el.value; return; }
   const snd = t.dataset.snd as "title" | "type" | "useAt" | undefined;
   if (snd) soundForm[snd] = el.value;
   const plp = t.dataset.plp;
@@ -1034,7 +1058,7 @@ function onChange(event: Event): void {
     return;
   }
   const d = t.dataset;
-  if (d.snd || d.plp) { storeForm(t); return; }
+  if (d.snd || d.plp || d.typeedit !== undefined) { storeForm(t); return; }
   if (d.active === "date" && t instanceof HTMLInputElement) { activeDate = t.value; void loadActive(); return; }
   const lib = d.lib;
   if (lib && (t instanceof HTMLInputElement || t instanceof HTMLSelectElement)) {
@@ -1049,7 +1073,7 @@ function onChange(event: Event): void {
 function onInput(event: Event): void {
   const t = event.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) {
-    if (t.dataset.snd || t.dataset.plp) { storeForm(t); return; }
+    if (t.dataset.snd || t.dataset.plp || t.dataset.typeedit !== undefined) { storeForm(t); return; }
   }
   if (t instanceof HTMLInputElement && t.dataset.lib === "text") {
     libFilter.text = t.value;
