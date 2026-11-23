@@ -11,7 +11,7 @@ import {
 } from "./pipgm/logic";
 import {
   checkSoundFile, extensionForMime, formatDuration, localDay, normalizeType, pickRecorderMime, presetRange, reasonLabel,
-  canRemoveFromActive, recordingFilename, recordingSupport, titleFromFilename, toggleType, typeLabel, type DatePreset
+  canRemoveFromActive, composeHymnNumber, formatStamp, hymnalPrefixOf, originLabel, previewOf, recordingFilename, recordingSupport, titleFromFilename, toggleType, typeLabel, type DatePreset
 } from "./pipgm/library";
 import {
   FEED_IDS, type ActiveFolder, type FeedId, type LibraryItem, type LibraryPage, type Pipeline, type PlaylistSummary,
@@ -38,13 +38,15 @@ let saved: PlaylistSummary[] | null = null;
 let banner: { title: string; next: string } | null = null;
 let notice = "";
 let loadReport: { feed: FeedId; report: LoadReport } | null = null;
-let dialog: "generate" | "save" | "permanent" | null = null;
+let dialog: "generate" | "save" | "permanent" | "edit-item" | null = null;
+/** The item open in the edit dialog: its title and library type as typed so far. */
+let editItem: { id: string; title: string; type: string } | null = null;
 /** An add waiting for the "is this a permanent asset?" answer (no use date was given). */
 let pendingAdd: (() => void) | null = null;
 let generateState: { date: string; busy: boolean; draftName: string; items: string[]; missing: number } | null = null;
 const PAGE_SIZE = 100;
 let libFilter = {
-  types: [] as string[], from: "", to: "", unscheduled: false, sort: "newest" as "newest" | "oldest" | "title" | "used",
+  types: [] as string[], hymnals: [] as string[], from: "", to: "", unscheduled: false, sort: "newest" as "newest" | "oldest" | "title" | "used",
   text: "", target: "PiPGM1" as FeedId
 };
 /** The filtered, paged answer of the service (the full list in `library` stays for lookups). */
@@ -58,8 +60,6 @@ let soundSrc: { blob: Blob; filename: string; mime: string; recorded: boolean; u
 let soundForm = { title: "", type: "", useAt: "" };
 let rec: { recorder: MediaRecorder; stream: MediaStream; chunks: Blob[]; startedAt: number; mime: string; tick: number } | null = null;
 let textTimer: number | undefined;
-/** The row whose library type is being changed. */
-let typeEdit: { id: string; value: string } | null = null;
 let panelOpen: { editor: boolean; saved: boolean } = { editor: true, saved: false };
 let dragIndex: number | null = null;
 let lastSignature = "";
@@ -151,7 +151,7 @@ async function ensureLibrary(force = false): Promise<void> {
 async function loadLibraryPage(): Promise<void> {
   try {
     libPage = await client.getLibraryPage({
-      type: libFilter.types, q: libFilter.text, usedFrom: libFilter.from, usedTo: libFilter.to,
+      type: libFilter.types, hymnal: libFilter.hymnals, q: libFilter.text, usedFrom: libFilter.from, usedTo: libFilter.to,
       unscheduled: libFilter.unscheduled, sort: libFilter.sort, limit: libLimit
     });
   } catch (error) {
@@ -572,6 +572,7 @@ function renderLibrary(): string {
     ${renderActiveFolder()}
     ${renderSoundSection()}
     ${renderTypeChips()}
+    ${renderHymnalChips()}
     <div class="flex gap-2 flex-wrap items-center">
       <input data-lib="text" value="${esc(libFilter.text)}" placeholder="Search title" class="${INPUT}">
       <select data-lib="sort" class="${INPUT}" aria-label="Sort">${[["newest", "Newest"], ["oldest", "Oldest"], ["title", "Title"], ["used", "Use date"]].map(([v, l]) => `<option value="${v}" ${libFilter.sort === v ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -580,29 +581,7 @@ function renderLibrary(): string {
     </div>
     ${renderDateFilters()}
     <div class="font-label-sm text-on-surface-variant">${page.total} item${page.total === 1 ? "" : "s"}</div>
-    <ul class="flex flex-col gap-1.5">${page.items.map((i) => {
-      const canva = i.canva?.exportJob;
-      const canvaBad = canva?.status === "failed";
-      const canvaBusy = canva && canva.status && !["ready", "completed", "success", "failed", "idle"].includes(canva.status);
-      const picked = pickedIds.has(i.id);
-      const star = inFolder.has(i.id) && !picked ? `<span class="material-symbols-outlined text-primary" title="In the active folder by date" aria-label="In the active folder by date">event_available</span>`
-        : `<button type="button" data-action="${picked ? "active-remove" : "active-add"}" data-id="${esc(i.id)}" aria-pressed="${picked}" aria-label="${picked ? "Remove from" : "Add to"} the active folder" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined ${picked ? "text-primary" : ""}">${picked ? "star" : "star_border"}</span></button>`;
-      return `<li class="flex items-center gap-2 p-2 rounded-lg bg-surface-container">
-        <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[i.kind] ?? "article"}</span>
-        <div class="flex-1 min-w-0"><div class="font-body-md truncate">${esc(i.title)}</div>
-          <div class="font-label-sm text-[11px] text-on-surface-variant"><span class="px-1.5 py-0.5 rounded-full bg-secondary-container">${esc(typeLabel(i.type ?? i.kind))}</span>${i.audio?.durationMs ? ` · ${esc(formatDuration(i.audio.durationMs))}` : ""}${i.audio?.origin === "recording" ? " · recorded" : ""}${i.useAt?.length ? ` · ${esc(i.useAt.join(", "))}` : ""}${canvaBusy ? ` · <span class="text-amber-600">Canva ${esc(canva?.status)}…</span>` : ""}${canvaBad ? ` · <span class="text-error">Canva failed${canva?.error ? `: ${esc(canva.error)}` : ""}</span>` : ""}</div></div>
-        ${typeEdit?.id === i.id ? `<div class="flex gap-1 items-center flex-wrap">
-          <input data-typeedit value="${esc(typeEdit.value)}" list="lib-types-edit" placeholder="Type" aria-label="Library type of ${esc(i.title)}" class="h-9 w-32 px-2 rounded-md bg-surface-container-highest font-body-sm">
-          <datalist id="lib-types-edit">${[...new Set([...(page.standardTypes ?? []), ...page.types.map((t) => t.type)])].map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
-          <button type="button" data-action="type-save" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Save</button>
-          <button type="button" data-action="type-default" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]" title="Use the default type of this kind of item">Default</button>
-          <button type="button" data-action="type-cancel" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px]">Cancel</button>
-        </div>` : `<button type="button" data-action="type-edit" data-id="${esc(i.id)}" aria-label="Change type of ${esc(i.title)}" title="Change type" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">label</span></button>`}
-        ${star}
-        ${i.kind === "audio" ? "" : `<button type="button" data-action="lib-add" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Add</button>`}
-        ${lan ? `<button type="button" data-action="lib-delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.title)}" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined">delete</span></button>` : ""}
-      </li>`;
-    }).join("") || `<li class="text-on-surface-variant font-body-sm">Nothing matches.</li>`}</ul>
+    <ul class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">${page.items.map((i) => renderItemCard(i, { lan, picked: pickedIds.has(i.id), inFolder: inFolder.has(i.id) })).join("") || `<li class="text-on-surface-variant font-body-sm">Nothing matches.</li>`}</ul>
     ${page.items.length < page.total ? `<button type="button" data-action="lib-more" class="${BTN} self-center">Show more (${page.total - page.items.length} left)</button>` : ""}
     <section class="rounded-xl bg-surface-container-low border border-outline-variant/40 p-3 flex flex-col gap-2">
       <div class="font-label-md font-bold uppercase">Add content</div>
@@ -613,7 +592,8 @@ function renderLibrary(): string {
         <button type="button" data-action="add-youtube" class="${BTN}">Add video</button>
       </div>
       <div class="flex gap-2 flex-wrap items-start">
-        <input data-new="hymn-number" placeholder="Number" class="h-10 w-24 px-3 rounded-lg bg-surface-container-highest font-body-sm">
+        <select data-new="hymn-hymnal" aria-label="Hymnal" class="${INPUT}">${(page.hymnalList ?? [{ prefix: "VK", name: "Virsikirja" }, { prefix: "LV", name: "Lasten virsi" }]).map((h) => `<option value="${esc(h.prefix)}" title="${esc(h.name)}">${esc(h.prefix)} · ${esc(h.name.length > 24 ? h.name.slice(0, 22) + "…" : h.name)}</option>`).join("")}</select>
+        <input data-new="hymn-number" placeholder="Number" inputmode="numeric" class="h-10 w-24 px-3 rounded-lg bg-surface-container-highest font-body-sm">
         <input data-new="hymn-title" placeholder="Hymn title" class="h-10 px-3 rounded-lg bg-surface-container-highest font-body-sm flex-1 min-w-[10rem]">
         <textarea data-new="hymn-text" rows="3" placeholder="Stanzas (blank line between stanzas)" class="px-3 py-2 rounded-lg bg-surface-container-highest font-body-sm w-full"></textarea>
         <button type="button" data-action="add-hymn" class="${BTN}">Add hymn</button>
@@ -622,7 +602,83 @@ function renderLibrary(): string {
   </div>`;
 }
 
+function renderHymnalChips(): string {
+  const counts = libPage?.hymnals ?? [];
+  if (!counts.length && !libFilter.hymnals.length) return "";
+  const names = new Map((libPage?.hymnalList ?? []).map((h) => [h.prefix, h.name]));
+  const total = counts.reduce((n, h) => n + h.count, 0);
+  const chip = (on: boolean) => `h-9 px-3 rounded-full font-label-sm text-[12px] ${on ? "bg-primary text-on-primary" : "bg-surface-container-highest"}`;
+  return `<div class="flex gap-1.5 flex-wrap items-center" role="group" aria-label="Filter by hymnal">
+    <span class="font-label-sm text-on-surface-variant">Hymnal</span>
+    <button type="button" data-action="lib-hymnal-all" class="${chip(libFilter.hymnals.length === 0)}">All (${total})</button>
+    ${counts.map((h) => `<button type="button" data-action="lib-hymnal" data-prefix="${esc(h.prefix)}" aria-pressed="${libFilter.hymnals.includes(h.prefix)}" title="${esc(names.get(h.prefix) ?? h.prefix)}" class="${chip(libFilter.hymnals.includes(h.prefix))}">${esc(h.prefix)} (${h.count})</button>`).join("")}
+  </div>`;
+}
+
+function renderPreview(i: LibraryItem): string {
+  const pv = previewOf(i, (path) => resolveApiUrl(path));
+  switch (pv.kind) {
+    // Previews play in this browser only (the page's own speakers), never on the church sound system.
+    case "audio": return `<audio controls preload="none" src="${esc(pv.url)}" class="w-full" aria-label="Preview of ${esc(i.title)}"></audio>`;
+    case "video": return `<video controls preload="metadata" playsinline src="${esc(pv.url)}" class="w-full max-h-56 rounded-md bg-black" aria-label="Preview of ${esc(i.title)}"></video>`;
+    case "image": return `<img loading="lazy" src="${esc(pv.url)}" alt="${esc(i.title)}" class="w-full max-h-56 object-contain rounded-md bg-surface-container-highest">`;
+    case "hymn": return `<div class="max-h-48 overflow-auto rounded-md bg-surface-container-highest p-2 font-body-sm whitespace-pre-wrap">${pv.stanzas.map((st) => `<div class="mb-2"><span class="font-label-sm text-on-surface-variant">${esc(st.number)}.</span> ${esc(st.text)}</div>`).join("")}</div>`;
+    case "youtube": return `<div class="rounded-md bg-surface-container-highest p-2 font-body-sm text-on-surface-variant">YouTube video${pv.url ? `: <span class="break-all">${esc(pv.url)}</span>` : ""}</div>`;
+    case "steps": return `<div class="rounded-md bg-surface-container-highest p-2 font-body-sm text-on-surface-variant">${pv.count} step${pv.count === 1 ? "" : "s"}</div>`;
+    default: return "";
+  }
+}
+
+function renderItemCard(i: LibraryItem, ctx: { lan: boolean; picked: boolean; inFolder: boolean }): string {
+  const canva = i.canva?.exportJob;
+  const canvaBad = canva?.status === "failed";
+  const canvaBusy = canva && canva.status && !["ready", "completed", "success", "failed", "idle"].includes(canva.status);
+  const star = ctx.inFolder && !ctx.picked ? `<span class="material-symbols-outlined text-primary" title="In the active folder by date" aria-label="In the active folder by date">event_available</span>`
+    : `<button type="button" data-action="${ctx.picked ? "active-remove" : "active-add"}" data-id="${esc(i.id)}" aria-pressed="${ctx.picked}" aria-label="${ctx.picked ? "Remove from" : "Add to"} the active folder" class="h-9 w-9 rounded-md bg-surface-container-highest"><span class="material-symbols-outlined ${ctx.picked ? "text-primary" : ""}">${ctx.picked ? "star" : "star_border"}</span></button>`;
+  const chip = "px-1.5 py-0.5 rounded-full bg-secondary-container";
+  const hymnal = i.kind === "hymn" ? `<span class="${chip}" title="Hymnal">${esc(hymnalPrefixOf(i.hymn?.hymnNumber))}</span>` : "";
+  const when = formatStamp(i.createdAt);
+  return `<li class="flex flex-col gap-2 p-3 rounded-xl bg-surface-container" data-card="${esc(i.id)}">
+    <div class="flex items-start gap-2">
+      <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[i.kind] ?? "article"}</span>
+      <div class="flex-1 min-w-0"><div class="font-body-md font-bold break-words">${esc(i.title)}</div>
+        <div class="flex flex-wrap gap-1 mt-0.5 font-label-sm text-[11px] text-on-surface-variant"><span class="${chip}">${esc(typeLabel(i.type ?? i.kind))}</span>${hymnal}${i.audio?.durationMs ? `<span>${esc(formatDuration(i.audio.durationMs))}</span>` : ""}${canvaBusy ? `<span class="text-amber-600">Canva ${esc(canva?.status)}…</span>` : ""}${canvaBad ? `<span class="text-error">Canva failed${canva?.error ? `: ${esc(canva.error)}` : ""}</span>` : ""}</div></div>
+    </div>
+    ${renderPreview(i)}
+    <div class="font-label-sm text-[11px] text-on-surface-variant">${when ? `${esc(originLabel(i))} ${esc(when)}` : ""}${i.useAt?.length ? `${when ? " · " : ""}Use ${esc(i.useAt.join(", "))}` : `${when ? " · " : ""}Permanent`}</div>
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <button type="button" data-action="item-edit" data-id="${esc(i.id)}" aria-label="Edit ${esc(i.title)}" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px] flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">edit</span>Edit</button>
+      ${star}
+      ${i.kind === "audio" ? "" : `<button type="button" data-action="lib-add" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-primary text-on-primary font-label-sm text-[12px]">Add</button>`}
+      ${ctx.lan ? `<button type="button" data-action="lib-delete" data-id="${esc(i.id)}" aria-label="Delete ${esc(i.title)}" class="h-9 w-9 rounded-md bg-surface-container-highest ml-auto"><span class="material-symbols-outlined">delete</span></button>` : ""}
+    </div>
+  </li>`;
+}
+
+function renderEditDialog(): string {
+  const e = editItem;
+  const it = e ? libPage?.items.find((x) => x.id === e.id) ?? itemById(e.id) : undefined;
+  if (!e || !it) return "";
+  const known = [...new Set([...(libPage?.standardTypes ?? []), ...(libPage?.types ?? []).map((t) => t.type)])];
+  const current = normalizeType(e.type);
+  const body = `<label class="flex flex-col gap-1 font-label-sm text-on-surface-variant">Title
+      <input data-edit="title" value="${esc(e.title)}" maxlength="200" class="${INPUT} w-full font-body-md text-on-surface"></label>
+    <div class="font-label-sm text-on-surface-variant">Type</div>
+    <div class="flex gap-1.5 flex-wrap" role="group" aria-label="Library type">${known.map((t) => `<button type="button" data-action="edit-pick-type" data-type="${esc(t)}" aria-pressed="${current === t}" class="h-9 px-3 rounded-full font-label-sm text-[12px] ${current === t ? "bg-primary text-on-primary" : "bg-surface-container-highest"}">${esc(typeLabel(t))}</button>`).join("")}</div>
+    <input data-edit="type" value="${esc(e.type)}" placeholder="Or type your own (jingle, prayer…)" aria-label="Custom type" class="${INPUT} w-full">
+    <div class="font-label-sm text-[11px] text-on-surface-variant">Default for this kind of item: ${esc(typeLabel(defaultTypeOfKind(it)))}. Lowercase letters, digits and dashes.</div>`;
+  return modal("Edit item", body,
+    `<button type="button" data-action="item-type-default" class="${BTN}" title="Use the default type of this kind of item">Default type</button>
+     <button type="button" data-action="item-save" class="${BTN_PRIMARY}">Save</button>`);
+}
+
+function defaultTypeOfKind(i: LibraryItem): string {
+  if (i.kind === "audio") return i.audio?.origin === "tts" || i.id.startsWith("tts-") ? "tts" : "sound";
+  return ({ hymn: "hymn", image: "image", video: "video", youtube: "video", pptx: "slides", canva: "canva" } as Record<string, string>)[i.kind] ?? "other";
+}
+
 function renderDialog(): string {
+  if (dialog === "edit-item") return renderEditDialog();
   if (dialog === "permanent") {
     return modal("Permanent asset?", `<div class="font-body-md">No use date was given. Add this as a permanent asset that stays in the library until you delete it?</div>`,
       `<button type="button" data-action="confirm-permanent" class="h-10 px-4 rounded-lg bg-primary text-on-primary font-label-md font-bold">Yes, permanent</button>`);
@@ -664,8 +720,8 @@ function signature(): string {
   return JSON.stringify([
     view, pipelines.map((p) => [p.id, p.state, p.playbackState, p.fadeToBlack, p.activeItemId, p.currentStep, p.totalSteps, p.audioEnabled, p.audioArmedUntil, !!p.audioTrack, p.playlist.map((i) => i.id), p.orientation]),
     [...stepsByFeed.entries()].map(([k, v]) => [k, v.steps.length, v.currentStep]), stepsKey.size,
-    libPage?.items.map((i) => [i.id, i.title, i.type, i.useAt]), libPage?.total, libPage?.types, activeFolder?.items.map((a) => [a.item.id, a.reason]),
-    activeDate, plpForm, typeEdit?.id, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
+    libPage?.items.map((i) => [i.id, i.title, i.type, i.useAt, i.createdAt]), libPage?.total, libPage?.types, libPage?.hymnals, activeFolder?.items.map((a) => [a.item.id, a.reason]),
+    activeDate, plpForm, editItem, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
     [...drafts.entries()], library?.length, saved?.map((s) => s.id), banner, notice, loadReport?.report.mode, dialog, generateState,
     libFilter, panelOpen, offline, pipelines.some((p) => armSecondsLeft(p) > 0) ? mins : 0
   ]);
@@ -790,7 +846,7 @@ function onClick(event: Event): void {
     // saved playlists
     case "open-save": dialog = "save"; render(); break;
     case "open-generate": dialog = "generate"; generateState = null; void ensureLibrary(); render(); break;
-    case "close-dialog": dialog = null; pendingAdd = null; render(); break;
+    case "close-dialog": dialog = null; editItem = null; pendingAdd = null; render(); break;
     case "confirm-permanent": { const run = pendingAdd; dialog = null; pendingAdd = null; render(); run?.(); break; }
     case "save-confirm": {
       const name = root?.querySelector<HTMLInputElement>("[data-save-name]")?.value.trim();
@@ -843,14 +899,26 @@ function onClick(event: Event): void {
     case "lib-preset": { const r = presetRange((target.dataset.preset ?? "today") as DatePreset); libFilter.from = r.from; libFilter.to = r.to; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break; }
     case "lib-clear-dates": libFilter.from = ""; libFilter.to = ""; libFilter.unscheduled = false; libLimit = PAGE_SIZE; void loadLibraryPage(); break;
     case "lib-more": libLimit += PAGE_SIZE; void loadLibraryPage(); break;
-    case "type-edit": { const it = page_item(target.dataset.id ?? ""); typeEdit = { id: target.dataset.id ?? "", value: it?.type ?? "" }; lastSignature = ""; render(true); break; }
-    case "type-cancel": typeEdit = null; lastSignature = ""; render(true); break;
-    case "type-save": case "type-default": {
-      const itemId = target.dataset.id ?? "";
-      const type = action === "type-default" ? null : (normalizeType(typeEdit?.value ?? "") ?? null);
-      if (!itemId) break;
-      if (action === "type-save" && !type) { banner = { title: "Type is empty", next: "Type a name, or press Default to use the default type of this item." }; render(); break; }
-      void act(() => client.setItemType(itemId, type), () => { typeEdit = null; library = null; void ensureLibrary(true); void loadActive(); });
+    case "lib-hymnal": { const p = target.dataset.prefix ?? ""; libFilter.hymnals = libFilter.hymnals.includes(p) ? libFilter.hymnals.filter((x) => x !== p) : [...libFilter.hymnals, p]; libLimit = PAGE_SIZE; void loadLibraryPage(); break; }
+    case "lib-hymnal-all": libFilter.hymnals = []; libLimit = PAGE_SIZE; void loadLibraryPage(); break;
+    case "item-edit": {
+      const it = page_item(target.dataset.id ?? "") ?? itemById(target.dataset.id ?? "");
+      if (it) { editItem = { id: it.id, title: it.title, type: it.type ?? "" }; dialog = "edit-item"; lastSignature = ""; render(); }
+      break;
+    }
+    case "edit-pick-type": if (editItem) { editItem.type = target.dataset.type ?? ""; lastSignature = ""; render(true); } break;
+    case "item-save": case "item-type-default": {
+      if (!editItem) break;
+      const it = page_item(editItem.id) ?? itemById(editItem.id);
+      const title = editItem.title.trim();
+      const type = action === "item-type-default" ? null : normalizeType(editItem.type);
+      if (!title) { banner = { title: "Title is empty", next: "Type a title for the item." }; render(); break; }
+      if (action === "item-save" && !type) { banner = { title: "Type is empty", next: "Pick a type or type a name, or press Default type." }; render(); break; }
+      const id = editItem.id;
+      const patch: { title?: string; type?: string | null } = {};
+      if (title !== it?.title) patch.title = title;
+      if (action === "item-type-default" || type !== (it?.type ?? undefined)) patch.type = type;
+      void act(() => client.updateItem(id, patch), () => { dialog = null; editItem = null; library = null; void ensureLibrary(true); void loadActive(); });
       break;
     }
     case "lib-delete": {
@@ -901,7 +969,7 @@ function onClick(event: Event): void {
       const q = (n: string) => root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-new=${n}]`);
       const title = q("hymn-title")?.value.trim() || (q("hymn-number")?.value.trim() ? `Virsi ${q("hymn-number")?.value.trim()}` : "");
       const text = q("hymn-text")?.value.trim() ?? "";
-      const number = q("hymn-number")?.value.trim() ?? "";
+      const number = composeHymnNumber((root?.querySelector<HTMLSelectElement>("[data-new=hymn-hymnal]")?.value) ?? "VK", q("hymn-number")?.value ?? "");
       if (!title || !text) { banner = { title: "Hymn needs a title and text", next: "Fill in the title (or number) and paste the stanzas." }; render(); break; }
       withUseDate((useAt) => void act(async () => { const it = await client.addHymn(title, number, text); if (useAt) await client.setUseAt(it.id, useAt); return it; }, () => { ["hymn-number", "hymn-title", "hymn-text"].forEach((n) => { const e = q(n); if (e) e.value = ""; }); void ensureLibrary(true); }));
       break;
@@ -925,7 +993,7 @@ function page_item(id: string): LibraryItem | undefined {
 
 function storeForm(t: HTMLElement): void {
   const el = t as HTMLInputElement;
-  if (t.dataset.typeedit !== undefined) { if (typeEdit) typeEdit.value = el.value; return; }
+  if (t.dataset.edit) { if (editItem) editItem[t.dataset.edit as "title" | "type"] = el.value; return; }
   const snd = t.dataset.snd as "title" | "type" | "useAt" | undefined;
   if (snd) soundForm[snd] = el.value;
   const plp = t.dataset.plp;
@@ -1058,7 +1126,7 @@ function onChange(event: Event): void {
     return;
   }
   const d = t.dataset;
-  if (d.snd || d.plp || d.typeedit !== undefined) { storeForm(t); return; }
+  if (d.snd || d.plp || d.edit) { storeForm(t); return; }
   if (d.active === "date" && t instanceof HTMLInputElement) { activeDate = t.value; void loadActive(); return; }
   const lib = d.lib;
   if (lib && (t instanceof HTMLInputElement || t instanceof HTMLSelectElement)) {
@@ -1073,7 +1141,7 @@ function onChange(event: Event): void {
 function onInput(event: Event): void {
   const t = event.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) {
-    if (t.dataset.snd || t.dataset.plp || t.dataset.typeedit !== undefined) { storeForm(t); return; }
+    if (t.dataset.snd || t.dataset.plp || t.dataset.edit) { storeForm(t); return; }
   }
   if (t instanceof HTMLInputElement && t.dataset.lib === "text") {
     libFilter.text = t.value;

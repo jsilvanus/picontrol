@@ -53,7 +53,7 @@ Replace the stub with a real tab, built in the existing style (`*-tab.ts` module
 - Audio: arm with countdown (`audioArmedUntil`), stop, and a red **Kill audio** button always visible on the tab.
 
 **Phase B, content (preparation):**
-- Library list with type icons and `use-at`, add to a feed's playlist, remove from the playlist.
+- Library as cards (2026-11-23): each item has a preview that plays or shows in this browser only (audio player for sound and TTS, image, video player, the hymn stanzas as text; slides show their step count), the type and hymnal chip, and the uploaded/recorded/created time plus use dates. **Edit** opens a dialog for the title and the library type (type chips, a free name, or the default of the kind). Hymn items filter by hymnal prefix (VK or no prefix = Virsikirja, LV = Lasten virsi, others from `PIPGM_HYMNALS`); the add-hymn form has a hymnal picker. Add to a feed's playlist, remove from the playlist.
 - Add: hymn (number), YouTube link, upload media, upload PPTX. Show Canva import tasks with progress and ready state.
 - Basic image picker per feed.
 - Text to speech: type a phrase, prepare, play on a feed (armed only). Show the 500 character limit.

@@ -87,6 +87,7 @@ export function createPipgmClient(options: ClientOptions) {
         ...(u.title ? { title: u.title } : {}), ...(u.type ? { type: u.type } : {}),
         ...(u.useAt ? { useAt: u.useAt } : {}), ...(u.recorded ? { recorded: true } : {})
       }),
+    updateItem: (itemId: string, patch: { title?: string; type?: string | null }) => call<LibraryItem>("PATCH", `/items/${enc(itemId)}`, patch),
     setItemType: (itemId: string, type: string | null) => call<LibraryItem>("PATCH", `/items/${enc(itemId)}`, { type }),
     /** LAN only on the gateway. */
     deleteItem: (itemId: string) => call<void>("DELETE", `/items/${enc(itemId)}`),

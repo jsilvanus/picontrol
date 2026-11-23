@@ -260,3 +260,38 @@ test("client changes the library type with PATCH, null restores the default", as
   assert.deepEqual(JSON.parse(calls[0].init.body), { type: "jingle" });
   assert.deepEqual(JSON.parse(calls[1].init.body), { type: null });
 });
+
+import { hymnalPrefixOf, composeHymnNumber, previewOf, originLabel, formatStamp, itemsQueryString as qs2 } from "../ui/src/pipgm/library.ts";
+
+test("hymnal prefix: none or VK is the Virsikirja, LV is Lasten virsi", () => {
+  assert.equal(hymnalPrefixOf("123"), "VK");
+  assert.equal(hymnalPrefixOf("VK 123"), "VK");
+  assert.equal(hymnalPrefixOf("lv12"), "LV");
+  assert.equal(hymnalPrefixOf(undefined), "VK");
+  assert.equal(composeHymnNumber("LV", "12"), "LV 12");
+  assert.equal(composeHymnNumber("VK", "12"), "12");
+  assert.equal(composeHymnNumber("LV", "VK 5"), "VK 5");
+  assert.equal(composeHymnNumber("LV", ""), "");
+  assert.equal(qs2({ hymnal: ["LV", "VK"] }), "?hymnal=LV%2CVK");
+});
+
+test("previewOf picks the preview by kind and resolves asset paths", () => {
+  const r = (p) => `http://gw${p}`;
+  assert.deepEqual(previewOf({ id: "a", title: "a", kind: "audio", audio: { assetUrl: "/api/v1/pipgm/assets/x", mimeType: "audio/mpeg" } }, r), { kind: "audio", url: "http://gw/api/v1/pipgm/assets/x", mime: "audio/mpeg" });
+  assert.equal(previewOf({ id: "b", title: "b", kind: "image", image: { assetUrl: "/api/v1/pipgm/assets/y" } }, r).kind, "image");
+  assert.equal(previewOf({ id: "c", title: "c", kind: "video", video: { assetUrl: "/api/v1/pipgm/assets/z" } }, r).kind, "video");
+  const hymn = previewOf({ id: "d", title: "d", kind: "hymn", hymn: { hymnNumber: "1", title: "t", stanzas: [{ stanzaNumber: "1", lines: ["a", "b"] }] } }, r);
+  assert.deepEqual(hymn, { kind: "hymn", stanzas: [{ number: "1", text: "a\nb" }] });
+  assert.equal(previewOf({ id: "e", title: "e", kind: "pptx", steps: [{}, {}] }, r).kind, "steps");
+  assert.equal(previewOf({ id: "f", title: "f", kind: "audio" }, r).kind, "none");
+});
+
+test("origin label and time stamp", () => {
+  assert.equal(originLabel({ kind: "audio", audio: { origin: "recording" } }), "Recorded");
+  assert.equal(originLabel({ kind: "audio", audio: { origin: "tts" } }), "Created");
+  assert.equal(originLabel({ kind: "image" }), "Uploaded");
+  assert.equal(originLabel({ kind: "hymn" }), "Created");
+  assert.match(formatStamp("2026-11-23T12:30:00Z"), /2026/);
+  assert.equal(formatStamp("nope"), "");
+  assert.equal(formatStamp(undefined), "");
+});
