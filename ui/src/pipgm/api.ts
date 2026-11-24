@@ -2,7 +2,7 @@
 // Writes need the gateway's own key; the browser only carries its session cookie.
 import type {
   ActiveFolder, ControlRequest, FeedId, LibraryItem, LibraryPage, LibraryQuery, LibraryStorage, LoadReport, Pipeline,
-  PlaylistDocument, PlaylistSummary, SavedPlaylist, SoundUpload, StepsResponse
+  PlaylistDocument, PlaylistSummary, PublishState, SavedPlaylist, SoundUpload, StepsResponse
 } from "./types.ts";
 import { itemsQueryString } from "./library.ts";
 
@@ -96,6 +96,12 @@ export function createPipgmClient(options: ClientOptions) {
       return (await call<{ items: PlaylistSummary[] }>("GET", "/playlists")).items;
     },
     getPlaylist: (id: string) => call<SavedPlaylist>("GET", `/playlists/${enc(id)}`),
+
+    // publishing of the feeds to MediaMTX (runtime, off by default)
+    getPublish: () => call<PublishState>("GET", "/publish"),
+    /** One feed on or off; the other feeds are not touched. */
+    setPublishFeed: (id: FeedId, on: boolean) => call<PublishState>("PUT", "/publish", { feeds: { [id]: on } }),
+    setPublishAddress: (rtspBase: string) => call<PublishState>("PUT", "/publish", { rtspBase }),
 
     // operate
     control: (id: FeedId, req: ControlRequest) => call<Pipeline>("POST", `/pipelines/${id}/control`, req),

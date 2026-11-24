@@ -183,3 +183,12 @@ export interface SoundUpload {
   useAt?: string;
   recorded?: boolean;
 }
+
+/** Runtime publishing of the feeds to MediaMTX (piprogram `/api/v1/pipgm/publish`). */
+export interface PublishState {
+  enabled: boolean;
+  feeds: Record<FeedId, boolean>;
+  rtspBase: string | null;
+  audio: boolean;
+  running: boolean;
+}
