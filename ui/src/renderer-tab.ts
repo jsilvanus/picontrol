@@ -662,6 +662,10 @@ function renderItemCard(i: LibraryItem, ctx: { lan: boolean; picked: boolean; in
     </div>
     ${renderPreview(i)}
     <div class="font-label-sm text-[11px] text-on-surface-variant">${when ? `${esc(originLabel(i))} ${esc(when)}` : ""}${i.useAt?.length ? `${when ? " · " : ""}Use ${esc(i.useAt.join(", "))}` : `${when ? " · " : ""}Permanent`}</div>
+    <div class="flex flex-col gap-1 font-label-sm text-[11px]">
+      <div class="flex flex-wrap items-center gap-1.5"><span class="text-on-surface-variant">Used on:</span>${(i.usedOn ?? []).length ? (i.usedOn ?? []).map((d) => `<span class="${chip} inline-flex items-center gap-1">${esc(d)}${ctx.lan ? `<button type="button" data-action="lib-used-remove" data-id="${esc(i.id)}" data-date="${esc(d)}" aria-label="Remove use on ${esc(d)} from ${esc(i.title)}" class="material-symbols-outlined text-[14px] leading-none">close</button>` : ""}</span>`).join("") : `<span class="text-on-surface-variant">not yet</span>`}</div>
+      ${ctx.lan ? `<div class="flex items-center gap-1.5"><input type="date" data-used-for="${esc(i.id)}" aria-label="New use date for ${esc(i.title)}" class="h-9 px-2 rounded-md bg-surface-container-highest"><button type="button" data-action="lib-used-add" data-id="${esc(i.id)}" class="h-9 px-2.5 rounded-md bg-surface-container-highest">Add use date</button></div>` : ""}
+    </div>
     <div class="flex items-center gap-1.5 flex-wrap">
       <button type="button" data-action="item-edit" data-id="${esc(i.id)}" aria-label="Edit ${esc(i.title)}" class="h-9 px-2.5 rounded-md bg-surface-container-highest font-label-sm text-[12px] flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">edit</span>Edit</button>
       ${star}
@@ -941,6 +945,20 @@ function onClick(event: Event): void {
       if (title !== it?.title) patch.title = title;
       if (action === "item-type-default" || type !== (it?.type ?? undefined)) patch.type = type;
       void act(() => client.updateItem(id, patch), () => { dialog = null; editItem = null; library = null; void ensureLibrary(true); void loadActive(); });
+      break;
+    }
+    case "lib-used-add": {
+      const itemId = target.dataset.id ?? "";
+      const date = root?.querySelector<HTMLInputElement>(`[data-used-for="${CSS.escape(itemId)}"]`)?.value ?? "";
+      if (!itemId) break;
+      if (!date) { banner = { title: "No date chosen", next: "Pick the day the item was used, then press Add use date." }; render(); break; }
+      void act(() => client.addUsedOn(itemId, date), () => { library = null; void ensureLibrary(true); });
+      break;
+    }
+    case "lib-used-remove": {
+      const itemId = target.dataset.id ?? "";
+      const date = target.dataset.date ?? "";
+      if (itemId && date) void act(() => client.removeUsedOn(itemId, date), () => { library = null; void ensureLibrary(true); });
       break;
     }
     case "lib-delete": {

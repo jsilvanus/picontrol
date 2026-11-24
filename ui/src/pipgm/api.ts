@@ -88,6 +88,9 @@ export function createPipgmClient(options: ClientOptions) {
         ...(u.useAt ? { useAt: u.useAt } : {}), ...(u.recorded ? { recorded: true } : {})
       }),
     updateItem: (itemId: string, patch: { title?: string; type?: string | null }) => call<LibraryItem>("PATCH", `/items/${enc(itemId)}`, patch),
+    /** Records a day the item was used. LAN only on the gateway for writes. */
+    addUsedOn: (itemId: string, date: string) => call<LibraryItem>("POST", `/items/${enc(itemId)}/used-on`, { date }),
+    removeUsedOn: (itemId: string, date: string) => call<LibraryItem>("DELETE", `/items/${enc(itemId)}/used-on/${enc(date)}`),
     setItemType: (itemId: string, type: string | null) => call<LibraryItem>("PATCH", `/items/${enc(itemId)}`, { type }),
     /** LAN only on the gateway. */
     deleteItem: (itemId: string) => call<void>("DELETE", `/items/${enc(itemId)}`),
