@@ -313,3 +313,15 @@ test("publishing is switched per feed and only that feed is sent", async () => {
   assert.deepEqual(JSON.parse(calls[0][2]), { feeds: { PiPGM2: true } });
   assert.deepEqual(JSON.parse(calls[2][2]), { rtspBase: "rtsp://127.0.0.1:8554" });
 });
+
+test("client records and removes used-on days of a library item", async () => {
+  const { f, calls } = fakeFetch(() => ({ status: 200, body: { id: "h-1", usedOn: ["2026-11-08"] } }));
+  const client = createPipgmClient({ resolve: (p) => p, fetch: f });
+  await client.addUsedOn("h-1", "2026-11-08");
+  await client.removeUsedOn("h-1", "2026-11-08");
+  assert.equal(calls[0].url, "/api/v1/pipgm/items/h-1/used-on");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { date: "2026-11-08" });
+  assert.equal(calls[1].url, "/api/v1/pipgm/items/h-1/used-on/2026-11-08");
+  assert.equal(calls[1].init.method, "DELETE");
+});

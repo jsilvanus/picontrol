@@ -30,6 +30,8 @@ export interface LibraryItem {
   video?: { filename?: string; mimeType?: string; assetUrl?: string; durationMs?: number };
   youtube?: { videoId?: string; url?: string };
   useAt?: string[];
+  /** Days the item was used (YYYY-MM-DD); several allowed. Missing on older items. */
+  usedOn?: string[];
   steps?: StepDescriptor[];
   hymn?: { hymnNumber: string; title: string; stanzas?: Array<{ stanzaNumber: string; lines: string[]; refrain?: boolean }> };
   canva?: { exportJob?: { status?: string; error?: string | null } };
