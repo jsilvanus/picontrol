@@ -14,7 +14,7 @@ import {
   canRemoveFromActive, composeHymnNumber, formatStamp, hymnalPrefixOf, originLabel, previewOf, recordingFilename, recordingSupport, titleFromFilename, toggleType, typeLabel, type DatePreset
 } from "./pipgm/library";
 import {
-  FEED_IDS, type ActiveFolder, type FeedId, type LibraryItem, type LibraryPage, type Pipeline, type PlaylistSummary,
+  FEED_IDS, type ActiveFolder, type FeedId, type LibraryItem, type LibraryPage, type Pipeline, type PlaylistSummary, type PublishState,
   type StepsResponse, type LoadReport
 } from "./pipgm/types";
 
@@ -67,6 +67,8 @@ let busyCount = 0;
 let frameTimer: number | undefined;
 let clockTimer: number | undefined;
 let offline = false;
+/** Publishing to MediaMTX per feed; null until known or when the gateway does not answer. */
+let publish: PublishState | null = null;
 
 const poller = createPoller(
   client,
@@ -76,6 +78,7 @@ const poller = createPoller(
       offline = false;
       if (banner?.title === "Cannot reach the gateway") banner = null;
       void syncSteps().then(() => render());
+      void client.getPublish().then((state) => { publish = state; render(); }, () => { publish = null; });
     },
     onError: (error) => {
       offline = true;
@@ -327,6 +330,19 @@ function btn(primary = false, on = false): string {
   if (primary) return `${base} bg-primary text-on-primary shadow-sm`;
   if (on) return `${base} bg-slate-800 text-white`;
   return `${base} bg-surface-container-highest text-on-surface`;
+}
+
+function renderPublishBar(): string {
+  if (!publish) return "";
+  const p = publish;
+  const toggles = FEED_IDS.map((id) => {
+    const on = p.feeds[id] === true;
+    return `<button type="button" data-action="publish-feed" data-feed="${id}" data-on="${on ? "0" : "1"}" aria-pressed="${on}" ${p.rtspBase ? "" : "disabled"} title="${on ? "Stop" : "Start"} publishing ${FEED_LABEL[id]} to MediaMTX" class="px-2 h-7 rounded-md font-label-sm text-[11px] font-bold ${on ? "bg-primary text-on-primary" : "bg-surface-container-highest text-on-surface-variant"} ${p.rtspBase ? "" : "opacity-50"}">${FEED_LABEL[id]} ${on ? "on" : "off"}</button>`;
+  }).join("");
+  const address = p.rtspBase
+    ? `<span class="text-on-surface-variant font-label-sm text-[11px]">${esc(p.rtspBase)}</span>`
+    : `<button type="button" data-action="publish-address" class="px-2 h-7 rounded-md bg-surface-container-highest text-on-surface-variant font-label-sm text-[11px] font-bold" title="Use the MediaMTX on this Pi">Set address (local MediaMTX)</button>`;
+  return `<div class="flex items-center gap-2 flex-wrap"><span class="font-label-sm text-[11px] uppercase font-bold text-on-surface-variant">Publish</span>${toggles}${address}</div>`;
 }
 
 function renderOperate(): string {
@@ -723,7 +739,7 @@ function signature(): string {
     libPage?.items.map((i) => [i.id, i.title, i.type, i.useAt, i.createdAt]), libPage?.total, libPage?.types, libPage?.hymnals, activeFolder?.items.map((a) => [a.item.id, a.reason]),
     activeDate, plpForm, editItem, soundSrc?.url, soundForm, rec ? 1 : 0, recordingSupportNow().ok,
     [...drafts.entries()], library?.length, saved?.map((s) => s.id), banner, notice, loadReport?.report.mode, dialog, generateState,
-    libFilter, panelOpen, offline, pipelines.some((p) => armSecondsLeft(p) > 0) ? mins : 0
+    libFilter, panelOpen, offline, publish, pipelines.some((p) => armSecondsLeft(p) > 0) ? mins : 0
   ]);
 }
 
@@ -743,7 +759,7 @@ function render(force = false): void {
   else body = renderFocus(view.id);
   root.innerHTML = `<div class="flex flex-col gap-3">
     <div class="flex items-center justify-between gap-3 flex-wrap">${renderKillBar()}${renderNav()}</div>
-    ${renderBanner()}${body}</div>${renderDialog()}`;
+    ${view.name === "operate" ? renderPublishBar() : ""}${renderBanner()}${body}</div>${renderDialog()}`;
   refreshFrames();
 }
 
@@ -789,6 +805,12 @@ function onClick(event: Event): void {
   switch (action) {
     case "kill-audio":
       void act(() => client.audioKill(), (items) => { pipelines = items.filter((p) => !p.hidden); notice = "Audio killed on every feed."; setTimeout(() => { notice = ""; render(); }, 4000); });
+      break;
+    case "publish-feed":
+      if (id) void act(() => client.setPublishFeed(id, target.dataset.on === "1"), (state) => { publish = state; });
+      break;
+    case "publish-address":
+      void act(() => client.setPublishAddress("rtsp://127.0.0.1:8554"), (state) => { publish = state; });
       break;
     case "kill-feed":
       if (id) void act(async () => { const stopped = await client.audioStop(id);

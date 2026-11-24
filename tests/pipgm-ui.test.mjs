@@ -295,3 +295,21 @@ test("origin label and time stamp", () => {
   assert.equal(formatStamp("nope"), "");
   assert.equal(formatStamp(undefined), "");
 });
+
+test("publishing is switched per feed and only that feed is sent", async () => {
+  const calls = [];
+  const client = createPipgmClient({
+    resolve: (p) => p,
+    fetch: async (url, init) => {
+      calls.push([init.method, String(url), init.body]);
+      return new Response(JSON.stringify({ enabled: true, feeds: { PiPGM1: false, PiPGM2: true, PiPGM3: false }, rtspBase: "rtsp://127.0.0.1:8554", audio: false, running: true }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+  });
+  const state = await client.setPublishFeed("PiPGM2", true);
+  assert.equal(state.feeds.PiPGM2, true);
+  await client.getPublish();
+  await client.setPublishAddress("rtsp://127.0.0.1:8554");
+  assert.deepEqual(calls.map((c) => [c[0], c[1]]), [["PUT", "/api/v1/pipgm/publish"], ["GET", "/api/v1/pipgm/publish"], ["PUT", "/api/v1/pipgm/publish"]]);
+  assert.deepEqual(JSON.parse(calls[0][2]), { feeds: { PiPGM2: true } });
+  assert.deepEqual(JSON.parse(calls[2][2]), { rtspBase: "rtsp://127.0.0.1:8554" });
+});
