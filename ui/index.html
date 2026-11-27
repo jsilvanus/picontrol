@@ -694,6 +694,11 @@
       <div id="radio-root" class="space-y-space-md"></div>
     </section>
 
+    <!-- TAB 10: TIMER (PiTimer) -->
+    <section id="tab-timer" class="tab-panel w-full px-margin pb-6 gap-space-md pt-4 space-y-space-md">
+      <div id="timer-root" class="space-y-space-md"></div>
+    </section>
+
     <!-- TAB: STATUS – Module and service health overview -->
     <section id="tab-status" class="tab-panel w-full px-margin pb-6 gap-space-md pt-4 space-y-space-md">
       <div id="status-root" class="space-y-space-md"></div>
@@ -1438,7 +1443,15 @@
           <span class="text-[9px] text-on-surface-variant">Slides & Pipeline</span>
         </button>
 
-        <!-- 9. Multiview Screen -->
+        <!-- 9. PiTimer (Deterministic Action Runner & Schedules) -->
+        <button type="button" id="more-tile-timer" data-tab="timer" onclick="selectMoreTab('timer')" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-timer" title="Active"></span>
+          <span class="material-symbols-outlined text-[24px]">timer</span>
+          <span class="font-label-sm text-[11px] uppercase font-bold">PiTimer</span>
+          <span class="text-[9px] text-on-surface-variant">Schedules & Runner</span>
+        </button>
+
+        <!-- 10. Multiview Screen -->
         <a href="/multiview" id="more-tile-multiview" class="p-3 rounded-xl bg-surface-container hover:bg-primary-container hover:text-on-primary text-on-surface flex flex-col items-center justify-center gap-1.5 transition-all text-center border border-outline-variant/20 shadow-xs relative">
           <span class="w-2 h-2 rounded-full bg-emerald-500 absolute top-2.5 right-2.5" id="more-badge-multiview" title="Active"></span>
           <span class="material-symbols-outlined text-[24px]">grid_view</span>

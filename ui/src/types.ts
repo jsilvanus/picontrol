@@ -1,4 +1,4 @@
-export type FrontendTabId = "outputs" | "inputs" | "cameras" | "youtube" | "tally" | "voice" | "radio" | "renderer" | "sound" | "status";
+export type FrontendTabId = "outputs" | "inputs" | "cameras" | "youtube" | "tally" | "voice" | "radio" | "renderer" | "sound" | "status" | "timer";
 
 export interface EcosystemComponent {
   id: string;

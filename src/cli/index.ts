@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { GatewayClient, type CliConfig } from "./client.js";
 
 function printUsage(): void {
@@ -25,6 +26,7 @@ COMMANDS:
   program <action> [...]     Control PiProgram presentation (status, pipelines, advance, hymn)
   space <action> [...]       Query PiSpace 3D venue & spatial solver (status, venue, solve)
   perception [status|tracks] Query PiPerception neural tracker
+  timer <action> [...]       Control PiTimer (status, mute, unmute, disable, enable, list, show, apply, run, cancel, runs)
   world                      Query fused World State (VAD + 3D spatial + speaker)
   transcripts                Query latest speech transcripts from Auditor
 
@@ -37,6 +39,7 @@ GLOBAL OPTIONS:
   --program <url>            piprogram base URL (default: http://127.0.0.1:3200)
   --space <url>              pispace base URL (default: http://127.0.0.1:3203)
   --perception <url>         piperception base URL (default: http://127.0.0.1:3202)
+  --timer <url>              pitimer base URL (default: http://127.0.0.1:3403)
   --api-key <key>            API key / Bearer token (default: PIGATEWAY_API_KEY)
   --json                     Output raw JSON
   -h, --help                 Show this help message
@@ -63,6 +66,7 @@ async function main(): Promise<void> {
     programUrl: process.env.PIPROGRAM_URL || "http://127.0.0.1:3200",
     spaceUrl: process.env.PISPACE_URL || "http://127.0.0.1:3203",
     perceptionUrl: process.env.PIPERCEPTION_URL || "http://127.0.0.1:3202",
+    timerUrl: process.env.PITIMER_URL || "http://127.0.0.1:3403",
     json: false,
   };
 
@@ -89,6 +93,8 @@ async function main(): Promise<void> {
       config.spaceUrl = args[++i]!;
     } else if (arg === "--perception" && i + 1 < args.length) {
       config.perceptionUrl = args[++i]!;
+    } else if (arg === "--timer" && i + 1 < args.length) {
+      config.timerUrl = args[++i]!;
     } else if (arg === "--api-key" && i + 1 < args.length) {
       config.apiKey = args[++i]!;
     } else if (arg === "--json") {
@@ -537,6 +543,87 @@ async function main(): Promise<void> {
           console.log(config.json ? JSON.stringify(res, null, 2) : res);
         } else {
           throw new Error(`Unknown perception action: ${sub}`);
+        }
+        break;
+      }
+
+      case "timer": {
+        if (!sub || sub === "status") {
+          const res = await client.getTimerStatus();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "mute") {
+          const arg1 = rest[0];
+          const arg2 = rest[1];
+          if (arg1 && !/^(1h|8h|24h|1w|permanent)$/i.test(arg1)) {
+            const res = await client.muteTimer(arg1, arg2);
+            console.log(config.json ? JSON.stringify(res, null, 2) : res);
+          } else {
+            const res = await client.muteTimers(arg1);
+            console.log(config.json ? JSON.stringify(res, null, 2) : res);
+          }
+        } else if (sub === "unmute") {
+          const id = rest[0];
+          const res = id ? await client.unmuteTimer(id) : await client.unmuteTimers();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "disable") {
+          const id = rest[0];
+          if (!id) {
+            console.error("Usage: picontrol timer disable <timer-id>");
+            process.exit(1);
+          }
+          const res = await client.updateTimer(id, { enabled: false });
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "enable") {
+          const id = rest[0];
+          if (!id) {
+            console.error("Usage: picontrol timer enable <timer-id>");
+            process.exit(1);
+          }
+          const res = await client.updateTimer(id, { enabled: true, mutedUntil: null });
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "list") {
+          const res = await client.listTimers();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "show") {
+          const id = rest[0];
+          if (!id) {
+            console.error("Usage: picontrol timer show <timer-id>");
+            process.exit(1);
+          }
+          const res = await client.getTimer(id);
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "apply") {
+          const file = rest[0];
+          if (!file) {
+            console.error("Usage: picontrol timer apply <file.pitimer>");
+            process.exit(1);
+          }
+          const content = readFileSync(file, "utf8");
+          const res = await client.saveTimer({ scriptText: content });
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "run") {
+          const id = rest[0];
+          const phase = rest[1];
+          if (!id) {
+            console.error("Usage: picontrol timer run <timer-id> [phase]");
+            process.exit(1);
+          }
+          const res = await client.runTimerPhase(id, phase);
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "cancel") {
+          const runId = rest[0];
+          if (!runId) {
+            console.error("Usage: picontrol timer cancel <run-id>");
+            process.exit(1);
+          }
+          const res = await client.cancelTimerRun(runId);
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else if (sub === "runs") {
+          const res = await client.listTimerRuns();
+          console.log(config.json ? JSON.stringify(res, null, 2) : res);
+        } else {
+          console.error(`Unknown timer action: ${sub}`);
+          process.exit(1);
         }
         break;
       }

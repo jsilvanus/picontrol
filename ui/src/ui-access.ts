@@ -20,6 +20,7 @@ export const TAB_MODULE_MAP: Record<string, string[]> = {
   voice:    ["pivoice"],
   radio:    ["radio", "radioRelay"],
   renderer: ["piprogram"],
+  timer:    ["pitimer"],
   status:   [],
 };
 
@@ -34,6 +35,7 @@ export const MODULE_TABS: Record<string, string[]> = {
   pisound:     ["sound"],
   pitally:     ["tally"],
   piprogram:   ["renderer"],
+  pitimer:     ["timer"],
   picam:       ["cameras"],
   cameras:     ["cameras"],
   pispace:     ["cameras"],

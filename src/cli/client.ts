@@ -36,6 +36,7 @@ export interface CliConfig {
   programUrl?: string;
   spaceUrl?: string;
   perceptionUrl?: string;
+  timerUrl?: string;
   apiKey?: string;
   json?: boolean;
 }
@@ -51,6 +52,7 @@ export class GatewayClient {
   readonly programUrl: string;
   readonly spaceUrl: string;
   readonly perceptionUrl: string;
+  readonly timerUrl: string;
   readonly apiKey?: string;
   readonly json: boolean;
 
@@ -65,6 +67,7 @@ export class GatewayClient {
     this.programUrl = (config.programUrl || "http://127.0.0.1:3200").replace(/\/+$/, "");
     this.spaceUrl = (config.spaceUrl || "http://127.0.0.1:3203").replace(/\/+$/, "");
     this.perceptionUrl = (config.perceptionUrl || "http://127.0.0.1:3202").replace(/\/+$/, "");
+    this.timerUrl = (config.timerUrl || process.env.PITIMER_URL || "http://127.0.0.1:3403").replace(/\/+$/, "");
     this.apiKey = config.apiKey || process.env.PIGATEWAY_API_KEY;
     this.json = Boolean(config.json);
   }
@@ -457,5 +460,110 @@ export class GatewayClient {
 
   async getTranscripts(): Promise<unknown[]> {
     return this.request(this.gatewayUrl, "/api/v1/transcripts");
+  }
+
+  // --- PiTimer (deterministic action runner & pre-flight scheduler) ---
+  async getTimerStatus(): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers/status");
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/status");
+    }
+  }
+
+  async muteTimers(duration?: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers/mute", "POST", duration ? { duration } : {});
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/mute", "POST", duration ? { duration } : {});
+    }
+  }
+
+  async unmuteTimers(): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers/unmute", "POST");
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/unmute", "POST");
+    }
+  }
+
+  async muteTimer(id: string, duration?: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}/mute`, "POST", duration ? { duration } : {});
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}/mute`, "POST", duration ? { duration } : {});
+    }
+  }
+
+  async unmuteTimer(id: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}/unmute`, "POST");
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}/unmute`, "POST");
+    }
+  }
+
+  async updateTimer(id: string, update: Record<string, unknown>): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}`, "PUT", update);
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}`, "PUT", update);
+    }
+  }
+
+  async listTimers(): Promise<unknown[]> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers") as unknown[];
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/timers") as unknown[];
+    }
+  }
+
+  async getTimer(id: string): Promise<Record<string, unknown>> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}`);
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}`);
+    }
+  }
+
+  async saveTimer(payload: unknown): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers", "POST", payload);
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/timers", "POST", payload);
+    }
+  }
+
+  async deleteTimer(id: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}`, "DELETE");
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}`, "DELETE");
+    }
+  }
+
+  async runTimerPhase(id: string, phase?: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/${encodeURIComponent(id)}/run`, "POST", phase ? { phase } : {});
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/timers/${encodeURIComponent(id)}/run`, "POST", phase ? { phase } : {});
+    }
+  }
+
+  async cancelTimerRun(runId: string): Promise<unknown> {
+    try {
+      return await this.request(this.gatewayUrl, `/api/v1/timers/runs/${encodeURIComponent(runId)}/cancel`, "POST");
+    } catch {
+      return await this.request(this.timerUrl, `/api/v1/runs/${encodeURIComponent(runId)}/cancel`, "POST");
+    }
+  }
+
+  async listTimerRuns(): Promise<unknown[]> {
+    try {
+      return await this.request(this.gatewayUrl, "/api/v1/timers/runs") as unknown[];
+    } catch {
+      return await this.request(this.timerUrl, "/api/v1/runs") as unknown[];
+    }
   }
 }

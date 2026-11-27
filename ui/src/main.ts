@@ -9,6 +9,7 @@ import { initYoutubeTab, setYoutubeTabActive, submitAdHocBroadcast, executeStopB
 import { initTallyTab, setTallyTabActive, sendDirectorCue } from "./tally-tab";
 import { initRadioTab, setRadioTabActive } from "./radio-tab";
 import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound-tab";
+import { initTimerTab, setTimerTabActive } from "./timer-tab";
 import { resolveApiUrl, resolveGatewayBaseUrl, setOutsideLan, setRuntimeGatewayBase } from "./config";
 import { currentRunId, openRunPage } from "./run-page";
 import { renderStatusTab, setStatusTabActive, refreshStatusTelemetry } from "./status-tab";
@@ -375,7 +376,7 @@ export async function triggerEcosystemProbe(): Promise<void> {
 // ============================================================================
 function switchTab(tab: FrontendTabId, pushUrl = true): void {
   activeTab = tab;
-  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "sound", "status"];
+  const tabs: FrontendTabId[] = ["outputs", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "sound", "status", "timer"];
   for (const t of tabs) {
     const panel = document.getElementById("tab-" + t);
     const nav = document.getElementById("nav-" + t);
@@ -395,12 +396,12 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
 
   const moreBtn = document.getElementById("nav-more");
   const moreLabel = document.getElementById("nav-more-label");
-  const isOverflowTab = tab === "radio" || tab === "inputs" || tab === "renderer" || tab === "sound";
+  const isOverflowTab = tab === "radio" || tab === "inputs" || tab === "renderer" || tab === "sound" || tab === "timer";
   if (moreBtn) {
     if (isOverflowTab) {
       moreBtn.className = "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg bg-primary text-on-primary shadow-sm transition-all active:scale-95";
       if (moreLabel) {
-        moreLabel.textContent = tab === "radio" ? "Radio" : tab === "inputs" ? "Matrix" : "Render";
+        moreLabel.textContent = tab === "radio" ? "Radio" : tab === "inputs" ? "Matrix" : tab === "timer" ? "Timer" : "Render";
       }
     } else {
       moreBtn.className = "flex flex-col items-center justify-center min-w-[54px] sm:min-w-[72px] h-11 px-1 rounded-lg text-on-surface-variant hover:bg-surface-container-high active:scale-95";
@@ -454,6 +455,10 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
     if (icon) icon.textContent = "tune";
     if (title) title.textContent = "Äänimikseri";
     if (subtitle) subtitle.textContent = "Sali & Striimi Mikseri (London BLU-100)";
+  } else if (tab === "timer") {
+    if (icon) icon.textContent = "timer";
+    if (title) title.textContent = "PiTimer";
+    if (subtitle) subtitle.textContent = "Deterministic Broadcast Automation & Schedules";
   } else if (tab === "status") {
     if (icon) icon.textContent = "monitoring";
     if (title) title.textContent = "System Status";
@@ -467,6 +472,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
   setRendererTabActive(tab === "renderer");
   setRadioTabActive(tab === "radio");
   setSoundTabActive(tab === "sound");
+  setTimerTabActive(tab === "timer");
   setStatusTabActive(tab === "status");
   if (tab === "status") renderStatusTab(latestEcosystem, serverModules);
 
@@ -481,6 +487,7 @@ function switchTab(tab: FrontendTabId, pushUrl = true): void {
       radio: "/radio",
       renderer: "/pipgm",
       sound: "/sound",
+      timer: "/timer",
       status: "/status"
     };
     window.history.replaceState(null, "", pathMap[tab]);
@@ -3063,7 +3070,7 @@ async function bootstrap(): Promise<void> {
   // If activeTab is now hidden by module toggles, switch to the first visible tab
   const activeTabPanel = document.getElementById(`tab-${activeTab}`);
   if (activeTabPanel && activeTabPanel.style.display === "none") {
-    const candidateTabs: FrontendTabId[] = ["outputs", "sound", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "status"];
+    const candidateTabs: FrontendTabId[] = ["outputs", "sound", "inputs", "cameras", "youtube", "tally", "voice", "radio", "renderer", "timer", "status"];
     const firstEnabled = candidateTabs.find((t) => {
       const p = document.getElementById(`tab-${t}`);
       return p && p.style.display !== "none";
@@ -3094,6 +3101,8 @@ async function bootstrap(): Promise<void> {
   if (radioRoot) initRadioTab(radioRoot);
   const soundRoot = document.getElementById("sound-root");
   if (soundRoot) initSoundTab(soundRoot, showToast);
+  const timerRoot = document.getElementById("timer-root");
+  if (timerRoot) initTimerTab(timerRoot);
   void fetch("/api/v1/composites/compose1")
     .then((r) => (r.ok ? (r.json() as Promise<{ keyColor?: string }>) : null))
     .then((c) => {
