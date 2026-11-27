@@ -12,7 +12,7 @@ import { initSoundTab, setSoundTabActive, handlePisoundTelemetry } from "./sound
 import { resolveApiUrl, resolveGatewayBaseUrl, setOutsideLan, setRuntimeGatewayBase } from "./config";
 import { currentRunId, openRunPage } from "./run-page";
 import { renderStatusTab, setStatusTabActive, refreshStatusTelemetry } from "./status-tab";
-import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler } from "./ui-access";
+import { applyModuleVisibility, fetchServerModules, chooseUiBackend, ensureUiSession, installCredentialedFetch, registerPinPromptHandler, type UiSessionInfo } from "./ui-access";
 
 // Global Fetch Interceptor for Gateway URL Routing & Authentication
 let activeUiBase: string | null = null;
@@ -2652,6 +2652,7 @@ window.adjustPtzSpeed = adjustPtzSpeed;
 // =========================================================================
 
 let uiPinSession = false;
+let currentSessionInfo: UiSessionInfo | null = null;
 
 function updateAuthHeaderBadge(): void {
   const token = localStorage.getItem("pimatrix_auth_token");
@@ -2662,7 +2663,11 @@ function updateAuthHeaderBadge(): void {
   const isWhitelisted = window.__PIMATRIX_INITIAL__?.isWhitelisted;
 
   if (uiPinSession) {
-    authLabel.textContent = "UNLOCKED · LOCK";
+    if (currentSessionInfo?.auth === "tunnus" && currentSessionInfo?.name) {
+      authLabel.textContent = currentSessionInfo.name.toUpperCase();
+    } else {
+      authLabel.textContent = "UNLOCKED · LOCK";
+    }
     authIcon.textContent = "lock_open";
     authIcon.classList.remove("text-error", "text-emerald-400");
     authIcon.classList.add("text-primary");
@@ -2689,10 +2694,10 @@ function updateAuthHeaderBadge(): void {
   }
 }
 
-let pinModalResolve: (((value: { role: string } | null) => void) | null) = null;
+let pinModalResolve: (((value: UiSessionInfo | null) => void) | null) = null;
 let isMandatoryAuth = false;
 
-export function promptPinModal(base: string, mandatory = true): Promise<{ role: string } | null> {
+export function promptPinModal(base: string, mandatory = true): Promise<UiSessionInfo | null> {
   return new Promise((resolve) => {
     const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
     if (!modal) {
@@ -2713,8 +2718,8 @@ export function promptPinModal(base: string, mandatory = true): Promise<{ role: 
 
     if (closeBtn) closeBtn.style.display = mandatory ? "none" : "";
     if (cancelBtn) cancelBtn.style.display = mandatory ? "none" : "";
-    if (desc) desc.textContent = mandatory ? "Syötä PIN-koodi jatkaaksesi:" : "Syötä ohjaussalasana tai PIN-koodi:";
-    if (title) title.textContent = mandatory ? "PIN-kirjautuminen" : "Control Authentication";
+    if (desc) desc.textContent = mandatory ? "Kirjaudu sisään Tunnuksella tai syötä PIN-koodi jatkaaksesi:" : "Kirjaudu Tunnuksella tai syötä ohjaussalasana:";
+    if (title) title.textContent = mandatory ? "Kirjautuminen / Sign In" : "Control Authentication";
 
     if (errorMsg) {
       errorMsg.textContent = "";
@@ -2733,6 +2738,50 @@ export function promptPinModal(base: string, mandatory = true): Promise<{ role: 
 }
 
 registerPinPromptHandler(promptPinModal);
+
+export async function loginWithTunnus(): Promise<void> {
+  const errorMsg = document.getElementById("auth-error-msg");
+  if (errorMsg) {
+    errorMsg.textContent = "";
+    errorMsg.classList.add("hidden");
+  }
+
+  // Generate PKCE code verifier and challenge
+  const array = new Uint8Array(32);
+  window.crypto.getRandomValues(array);
+  const codeVerifier = Array.from(array, (byte) => ("0" + byte.toString(16)).slice(-2)).join("");
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(codeVerifier);
+  const digest = await window.crypto.subtle.digest("SHA-256", data);
+  const base64Digest = btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const state = Math.random().toString(36).substring(2, 15);
+  sessionStorage.setItem("tunnus_oidc_state", state);
+  sessionStorage.setItem("tunnus_oidc_verifier", codeVerifier);
+
+  const issuer = "https://kehitys.riihimaenseurakunta.fi/identity";
+  const authEndpoint = `${issuer}/auth`;
+  const redirectUri = new URL(window.location.pathname, window.location.origin).href;
+  const clientId = "pigateway";
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: "openid profile email groups",
+    state,
+    code_challenge: base64Digest,
+    code_challenge_method: "S256"
+  });
+
+  window.location.href = `${authEndpoint}?${params.toString()}`;
+}
+
+(window as unknown as { loginWithTunnus: () => void }).loginWithTunnus = loginWithTunnus;
 
 /** The lock button: with a PIN session it locks at once (session ended on the gateway, PIN asked again). */
 export async function lockNow(): Promise<boolean> {
@@ -2864,13 +2913,16 @@ export async function submitAuthPassword(): Promise<void> {
       } else {
         localStorage.removeItem("pimatrix_auth_token");
       }
-      if (uiSessionOk) uiPinSession = true;
+      if (uiSessionOk) {
+        uiPinSession = true;
+        currentSessionInfo = { role: sessionRole, auth: "pin" };
+      }
       updateAuthHeaderBadge();
       isMandatoryAuth = false;
       const modal = document.getElementById("auth-modal-overlay") as HTMLDialogElement | null;
       modal?.close();
       if (pinModalResolve) {
-        pinModalResolve({ role: sessionRole });
+        pinModalResolve({ role: sessionRole, auth: "pin" });
         pinModalResolve = null;
       }
     } else {
@@ -2942,7 +2994,6 @@ export function copyMediaMtxPassword(): void {
 };
 
 async function bootstrap(): Promise<void> {
-  // PIN login and module visibility (ui-access.ts). Waits for the session before the rest starts.
   const lanBase = resolveGatewayBaseUrl();
   const relayRaw = (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_RELAY_URL ?? "";
   const relayBase = relayRaw.replace(/\/+$/, "");
@@ -2953,7 +3004,56 @@ async function bootstrap(): Promise<void> {
     relayMode = true;
   }
   installCredentialedFetch(uiBase);
+
+  // Check if returning from Tunnus OIDC authorization redirect (?code=...&state=...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const authCode = urlParams.get("code");
+  const authState = urlParams.get("state");
+  if (authCode) {
+    const savedState = sessionStorage.getItem("tunnus_oidc_state");
+    const codeVerifier = sessionStorage.getItem("tunnus_oidc_verifier");
+    if (!savedState || authState === savedState) {
+      sessionStorage.removeItem("tunnus_oidc_state");
+      sessionStorage.removeItem("tunnus_oidc_verifier");
+      try {
+        const issuer = "https://kehitys.riihimaenseurakunta.fi/identity";
+        const tokenRes = await fetch(`${issuer}/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: "pigateway",
+            code: authCode,
+            redirect_uri: new URL(window.location.pathname, window.location.origin).href,
+            ...(codeVerifier ? { code_verifier: codeVerifier } : {})
+          })
+        });
+        if (tokenRes.ok) {
+          const tokenData = (await tokenRes.json()) as { access_token?: string; id_token?: string };
+          const token = tokenData.access_token || tokenData.id_token;
+          if (token && uiBase) {
+            await fetch(`${uiBase}/ui/api/login`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token })
+            });
+          }
+        }
+      } catch {
+        // Tunnus token exchange fallback
+      }
+      urlParams.delete("code");
+      urlParams.delete("state");
+      urlParams.delete("iss");
+      const cleanSearch = urlParams.toString();
+      const cleanUrl = window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }
+
   const session = await ensureUiSession(uiBase);
+  currentSessionInfo = session;
   uiPinSession = Boolean(uiBase && session);
   const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
   setOutsideLan(isOutsideLan);

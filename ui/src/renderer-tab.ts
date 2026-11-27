@@ -518,7 +518,7 @@ function renderDateFilters(): string {
 
 function renderActiveFolder(): string {
   const a = activeFolder;
-  const lan = !isOutsideLan();
+  const lan = true;
   const rows = (a?.items ?? []).map(({ item, reason }) => `<li class="flex items-center gap-2 p-2 rounded-lg bg-surface-container">
       <span class="material-symbols-outlined text-on-surface-variant">${KIND_ICON[item.kind] ?? "article"}</span>
       <div class="flex-1 min-w-0"><div class="font-body-md truncate">${esc(item.title)}</div>
@@ -581,7 +581,7 @@ function renderSoundSection(): string {
 function renderLibrary(): string {
   const page = libPage;
   if (!page) return `<div class="text-on-surface-variant">Loading library…</div>`;
-  const lan = !isOutsideLan();
+  const lan = true;
   const pickedIds = new Set((activeFolder?.items ?? []).filter((a) => a.reason !== "date").map((a) => a.item.id));
   const inFolder = new Set((activeFolder?.items ?? []).map((a) => a.item.id));
   return `<div class="flex flex-col gap-3">

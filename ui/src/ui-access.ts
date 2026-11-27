@@ -133,7 +133,19 @@ export function installCredentialedFetch(base: string): void {
   };
 }
 
-export type PinPromptFn = (base: string, mandatory: boolean) => Promise<{ role: string } | null>;
+export interface UiSessionInfo {
+  role: string;
+  auth?: "pin" | "tunnus" | "trusted";
+  sub?: string;
+  name?: string;
+  rights?: string[];
+  oidcConfig?: {
+    issuer?: string;
+    audience?: string;
+  };
+}
+
+export type PinPromptFn = (base: string, mandatory: boolean) => Promise<UiSessionInfo | null>;
 
 let pinPromptHandler: PinPromptFn | null = null;
 
@@ -141,15 +153,15 @@ export function registerPinPromptHandler(handler: PinPromptFn): void {
   pinPromptHandler = handler;
 }
 
-let activeSessionPromise: Promise<{ role: string } | null> | null = null;
+let activeSessionPromise: Promise<UiSessionInfo | null> | null = null;
 
 /** Resolves once a session exists; invokes the pin prompt modal until then. */
-export async function ensureUiSession(base: string): Promise<{ role: string } | null> {
+export async function ensureUiSession(base: string): Promise<UiSessionInfo | null> {
   if (!base) return { role: "local" };
-  const check = async (): Promise<{ role: string } | null> => {
+  const check = async (): Promise<UiSessionInfo | null> => {
     try {
       const res = await fetch(`${base}/ui/api/session`, { credentials: "include" });
-      return res.ok ? ((await res.json()) as { role: string }) : null;
+      return res.ok ? ((await res.json()) as UiSessionInfo) : null;
     } catch {
       return null;
     }

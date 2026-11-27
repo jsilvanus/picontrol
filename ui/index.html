@@ -1244,7 +1244,21 @@
         </button>
       </div>
 
-      <p class="font-body-sm text-[12px] text-on-surface-variant" id="auth-dialog-desc">Syötä PIN-koodi avataksesi ohjauksen:</p>
+      <p class="font-body-sm text-[12px] text-on-surface-variant" id="auth-dialog-desc">Kirjaudu sisään Tunnuksella tai syötä PIN-koodi avataksesi ohjauksen:</p>
+
+      <!-- Tunnus OIDC Login Button -->
+      <div id="tunnus-login-section" class="pb-1">
+        <button type="button" id="tunnus-login-btn" onclick="loginWithTunnus()" class="w-full h-11 px-4 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:brightness-110 active:scale-[0.99] text-on-primary font-label-md text-[13px] font-bold flex items-center justify-center gap-2 shadow-md transition-all">
+          <span class="material-symbols-outlined text-[20px]">account_circle</span>
+          <span id="tunnus-login-btn-text">Kirjaudu Tunnuksella / Log in with Tunnus</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 my-1">
+        <div class="h-px bg-outline-variant/30 flex-1"></div>
+        <span class="font-label-sm text-[10px] text-on-surface-variant uppercase font-semibold">tai PIN-koodi / or PIN</span>
+        <div class="h-px bg-outline-variant/30 flex-1"></div>
+      </div>
 
       <form id="auth-form" onsubmit="event.preventDefault(); submitAuthPassword();" class="space-y-2">
         <div class="relative">
