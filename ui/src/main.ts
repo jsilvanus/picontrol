@@ -3055,7 +3055,7 @@ async function bootstrap(): Promise<void> {
   const session = await ensureUiSession(uiBase);
   currentSessionInfo = session;
   uiPinSession = Boolean(uiBase && session);
-  const isOutsideLan = Boolean(relayBase && uiBase === relayBase) || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
+  const isOutsideLan = Boolean(relayBase && uiBase === relayBase && session?.role !== "lan") || session?.role === "relay" || new URLSearchParams(window.location.search).has("relay");
   setOutsideLan(isOutsideLan);
   serverModules = await fetchServerModules(uiBase);
   applyModuleVisibility(serverModules, isOutsideLan);
